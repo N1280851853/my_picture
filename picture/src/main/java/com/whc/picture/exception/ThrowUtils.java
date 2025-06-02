@@ -1,4 +1,4 @@
-package com.whc.yunpicturebackend.exception;
+package com.whc.picture.exception;
 
 /**
  * 异常处理工具类

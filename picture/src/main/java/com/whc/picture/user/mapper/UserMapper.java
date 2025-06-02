@@ -1,7 +1,7 @@
-package com.whc.yunpicturebackend.user.mapper;
+package com.whc.picture.user.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.whc.picture.User;
+import com.whc.picture.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

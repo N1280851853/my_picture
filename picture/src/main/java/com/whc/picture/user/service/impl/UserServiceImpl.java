@@ -1,9 +1,9 @@
-package com.whc.yunpicturebackend.user.service.impl;
+package com.whc.picture.user.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.whc.picture.User;
-import com.whc.yunpicturebackend.user.mapper.UserMapper;
-import com.whc.yunpicturebackend.user.service.UserService;
+import com.whc.picture.entity.User;
+import com.whc.picture.user.mapper.UserMapper;
+import com.whc.picture.user.service.UserService;
 import org.springframework.stereotype.Service;
 
 /**

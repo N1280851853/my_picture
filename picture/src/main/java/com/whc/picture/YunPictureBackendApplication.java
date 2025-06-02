@@ -1,4 +1,4 @@
-package com.whc.yunpicturebackend;
+package com.whc.picture;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

@@ -1,6 +1,6 @@
-package com.whc.yunpicturebackend.common;
+package com.whc.picture.common;
 
-import com.whc.yunpicturebackend.exception.ErrorCode;
+import com.whc.picture.exception.ErrorCode;
 
 /**
  * @author： whc

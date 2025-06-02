@@ -1,7 +1,7 @@
-package com.whc.yunpicturebackend.user.service;
+package com.whc.picture.user.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.whc.picture.User;
+import com.whc.picture.entity.User;
 
 /**
 * @author simceredx

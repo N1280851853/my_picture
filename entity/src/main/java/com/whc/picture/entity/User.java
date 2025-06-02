@@ -1,9 +1,6 @@
-package com.whc.picture;
+package com.whc.picture.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
@@ -19,8 +16,11 @@ import java.util.Date;
 public class User {
     /**
      * id
+     * 这里使用 IdType.ASSIGN_ID 让mybatis生成长整型的id
+     * IdType.ASSIGN_ID 的缺点是别人容易爬取数据
+     *
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
@@ -75,6 +75,7 @@ public class User {
      * 是否删除
      */
     @TableField(value = "is_delete")
+    @TableLogic
     private Integer isDelete;
 
 }

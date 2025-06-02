@@ -1,4 +1,4 @@
-package com.whc.yunpicturebackend.common;
+package com.whc.picture.common;
 
 import lombok.Data;
 

@@ -1,7 +1,7 @@
-package com.whc.yunpicturebackend.exception;
+package com.whc.picture.exception;
 
-import com.whc.yunpicturebackend.common.BaseResponse;
-import com.whc.yunpicturebackend.common.ResultUtils;
+import com.whc.picture.common.BaseResponse;
+import com.whc.picture.common.ResultUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;

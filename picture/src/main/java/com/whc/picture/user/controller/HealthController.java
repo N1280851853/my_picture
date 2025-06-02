@@ -1,7 +1,7 @@
-package com.whc.yunpicturebackend.controller;
+package com.whc.picture.user.controller;
 
-import com.whc.yunpicturebackend.common.BaseResponse;
-import com.whc.yunpicturebackend.common.ResultUtils;
+import com.whc.picture.common.BaseResponse;
+import com.whc.picture.common.ResultUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/")
-public class MainController {
+public class HealthController {
 
     /**
      * 健康检测

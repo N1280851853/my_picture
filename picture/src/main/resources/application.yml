@@ -4,14 +4,10 @@ server:
     context-path: /api
 
 spring:
+  profiles:
+    active: accept
   application:
     name: yu-picture-backend
-
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/whc_picture
-    username: root
-    password: 123456
 
 mybatis-plus:
   configuration:
@@ -19,12 +15,9 @@ mybatis-plus:
     map-underscore-to-camel-case: true
     #查询出来的属性如果为null值，默认是不返回这个属性字段的，需要配置为true
     call-setters-on-nulls: true
-    # 开发环境打印日志‘
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     db-config:
       # 指定逻辑删除字段
-      logic-delete-field: isDelete
       logic-delete-value: 1 # 逻辑已删除值（默认是 1）
       logic-not-delete-value: 0 # 逻辑未删除值（默认是 0）
 
