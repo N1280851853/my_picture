@@ -1,6 +1,6 @@
 package com.whc.picture.user;
 
-import com.whc.picture.constant.UserRokeEnum;
+import com.whc.picture.constant.UserRoleEnum;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -9,7 +9,7 @@ class UserTest {
 
     @Test
     void contextLoads() {
-        UserRokeEnum value = UserRokeEnum.getUserRokeEnum("");
+        UserRoleEnum value = UserRoleEnum.getUserRokeEnum("");
         System.out.println(value);
     }
 

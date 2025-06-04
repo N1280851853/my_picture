@@ -90,6 +90,13 @@
         </dependency>
         <!--结束-->
 
+        <!-- 引入validation用于参数校验-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- 引入validation用于参数校验 【end】-->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>

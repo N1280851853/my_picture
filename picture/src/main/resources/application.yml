@@ -31,4 +31,4 @@ knife4j:
       default:
         api-rule: package
         api-rule-resources:
-          - com.whc.yunpicturebackend.controller
+          - com.whc.picture
