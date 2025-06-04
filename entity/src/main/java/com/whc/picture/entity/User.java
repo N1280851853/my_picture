@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 /**
@@ -62,14 +63,14 @@ public class User {
     /**
      * 创建时间
      */
-    @TableField(value = "gmt_create")
-    private Date gmtCreate;
+    @TableField(value = "gmt_create", fill = FieldFill.INSERT)
+    private LocalDateTime gmtCreate;
 
     /**
      * 更新时间
      */
-    @TableField(value = "gmt_modified")
-    private Date gmtModified;
+    @TableField(value = "gmt_modified", fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime gmtModified;
 
     /**
      * 是否删除
