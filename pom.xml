@@ -18,6 +18,7 @@
 
     <modules>
         <module>entity</module>
+        <module>picture</module>
     </modules>
 
     <properties>

@@ -9,13 +9,17 @@ import com.whc.picture.constant.UserRoleEnum;
 import com.whc.picture.entity.User;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
+import com.whc.picture.exception.ThrowUtils;
+import com.whc.picture.user.controller.qo.UserAddQO;
 import com.whc.picture.user.controller.qo.UserLoginQO;
 import com.whc.picture.user.controller.qo.UserRegisterQO;
+import com.whc.picture.user.controller.qo.UserUpdateQO;
 import com.whc.picture.user.controller.vo.LoginUserVO;
 import com.whc.picture.user.mapper.UserMapper;
 import com.whc.picture.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
@@ -29,6 +33,7 @@ import java.time.format.DateTimeFormatter;
 */
 @Slf4j
 @Service
+@Transactional
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Override
@@ -132,6 +137,44 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         return DigestUtils.md5DigestAsHex(pwd.getBytes());
     }
+
+    @Override
+    public long userAdd(UserAddQO qo) {
+
+        // 3. 插入数据到数据库中
+        User user = new User();
+        // 获取加密后的默认密码
+        String encryptPassword = getEncryptPassword(DEFAULT_PASSWORD);
+
+        user.setUserAccount(qo.getUserAccount())
+                .setUserPassword(encryptPassword)
+                // 给一个默认用户名称
+                .setUserName(qo.getUserName())
+                .setUserAvatar(qo.getUserAvatar())
+                .setUserProfile(qo.getUserProfile())
+                .setUserRole(qo.getUserRole());
+
+        boolean res = this.save(user);
+        ThrowUtils.throwIf(!res, ErrorCode.OPERATION_ERROR);
+
+        return user.getId();
+    }
+
+    @Override
+    public long userUpdate(UserUpdateQO qo) {
+        User user = new User();
+        user.setId(qo.getId())
+                .setUserAccount(qo.getUserAccount())
+                .setUserName(qo.getUserName())
+                .setUserAvatar(qo.getUserAvatar())
+                .setUserProfile(qo.getUserProfile())
+                .setUserRole(qo.getUserRole());
+        boolean b = this.updateById(user);
+        ThrowUtils.throwIf(!b, ErrorCode.OPERATION_ERROR);
+        return user.getId();
+    }
+
+
 }
 
 

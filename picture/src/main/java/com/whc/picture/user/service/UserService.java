@@ -2,8 +2,10 @@ package com.whc.picture.user.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.whc.picture.entity.User;
+import com.whc.picture.user.controller.qo.UserAddQO;
 import com.whc.picture.user.controller.qo.UserLoginQO;
 import com.whc.picture.user.controller.qo.UserRegisterQO;
+import com.whc.picture.user.controller.qo.UserUpdateQO;
 import com.whc.picture.user.controller.vo.LoginUserVO;
 
 import javax.servlet.http.HttpServletRequest;
@@ -14,6 +16,8 @@ import javax.servlet.http.HttpServletRequest;
 * @createDate 2025-05-28 20:12:17
 */
 public interface UserService extends IService<User> {
+
+    String DEFAULT_PASSWORD = "12345678";
 
     /**
      * 用户登录
@@ -42,4 +46,18 @@ public interface UserService extends IService<User> {
      * @return
      */
     String getEncryptPassword(String userPassword);
+
+    /**
+     * 添加用户
+     * @param qo
+     * @return
+     */
+    long userAdd(UserAddQO qo);
+
+    /**
+     * 更新用户
+     * @param qo
+     * @return
+     */
+    long userUpdate(UserUpdateQO qo);
 }
