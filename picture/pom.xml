@@ -59,7 +59,6 @@
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-jsqlparser</artifactId>
-            <version>3.5.12</version> <!-- 确保版本和 MyBatis Plus 主包一致 -->
         </dependency>
 
         <dependency>

@@ -13,12 +13,21 @@ import java.io.Serializable;
 @Data
 public class BaseResponse<T> implements Serializable {
 
-
+    /**
+     * 状态码
+     */
     private int code;
 
+    /**
+     * 状态描述
+     */
+    private String message;
+
+    /**
+     * 结果集
+     */
     private T data;
 
-    private String message;
 
     public BaseResponse(int code, T data, String message) {
         this.code = code;

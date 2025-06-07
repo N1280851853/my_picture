@@ -55,6 +55,7 @@ public class UserController {
      * @param qo
      * @return
      */
+    @PostMapping("/register")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Object> register(@RequestBody @Validated UserRegisterQO qo) {
         // 检测用户账号是否和数据库中已有的重复

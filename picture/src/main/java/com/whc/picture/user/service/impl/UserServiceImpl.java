@@ -99,11 +99,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         User user = new User();
         user.setUserAccount(qo.getUserAccount())
                 .setUserPassword(encryptPassword)
+                // 给一个默认用户名称
                 .setUserName("无名")
                 .setUserRole(UserRoleEnum.USER.getValue());
 
         boolean save = this.save(user);
-
+        ThrowUtils.throwIf(!save, ErrorCode.OPERATION_ERROR);
         return user.getId();
     }
 
