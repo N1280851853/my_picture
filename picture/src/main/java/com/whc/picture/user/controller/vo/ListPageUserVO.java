@@ -44,4 +44,16 @@ public class ListPageUserVO implements Serializable {
      */
     private String userRole;
 
+    /**
+     * 用户创建时间
+     */
+    private String gmtCreate;
+
+    /**
+     * 用户更新时间
+     */
+    private String gmtModified;
+
+
+
 }

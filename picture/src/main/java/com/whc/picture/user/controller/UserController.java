@@ -41,6 +41,7 @@ public class UserController {
 
     /**
      * 用户登录
+     *
      * @param qo
      * @param request
      * @return
@@ -52,6 +53,7 @@ public class UserController {
 
     /**
      * 用户注册
+     *
      * @param qo
      * @return
      */
@@ -74,6 +76,7 @@ public class UserController {
 
     /**
      * 获取登录用户
+     *
      * @param request
      * @return
      */
@@ -89,14 +92,15 @@ public class UserController {
                 .setUserAvatar(loginUser.getUserAvatar())
                 .setUserProfile(loginUser.getUserProfile())
                 .setUserRole(loginUser.getUserRole())
-                .setGmtCreate(loginUser.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_MINUTE_PATTERN)))
-                .setGmtModified(LocalDateTimeUtil.format(loginUser.getGmtModified(), DatePattern.NORM_DATETIME_MINUTE_PATTERN));
+                .setGmtCreate(loginUser.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
+                .setGmtModified(LocalDateTimeUtil.format(loginUser.getGmtModified(), DatePattern.NORM_DATETIME_PATTERN));
 
         return ResultUtils.success(vo);
     }
 
     /**
      * 退出登录
+     *
      * @param request
      * @return
      */
@@ -136,6 +140,7 @@ public class UserController {
 
     /**
      * 根据用户id获取用户(仅管理员使用)
+     *
      * @param qo
      * @return
      */
@@ -152,6 +157,7 @@ public class UserController {
 
     /**
      * 根据用户id获取用户信息的包装类
+     *
      * @param qo
      * @return
      */
@@ -177,6 +183,7 @@ public class UserController {
 
     /**
      * 删除用户(仅管理员使用)
+     *
      * @param qo
      * @return
      */
@@ -190,6 +197,7 @@ public class UserController {
 
     /**
      * 更新用户(仅管理员使用)
+     *
      * @param qo
      * @return
      */
@@ -202,6 +210,7 @@ public class UserController {
 
     /**
      * 获取用户列表(分页)
+     *
      * @param qo
      * @return
      */
@@ -214,7 +223,9 @@ public class UserController {
                         User::getUserName,
                         User::getUserAvatar,
                         User::getUserProfile,
-                        User::getUserRole
+                        User::getUserRole,
+                        User::getGmtCreate,
+                        User::getGmtModified
                 )
                 .likeRight(ObjectUtil.isNotEmpty(qo.getUserName()), User::getUserName, qo.getUserName())
                 .likeRight(ObjectUtil.isNotEmpty(qo.getUserAccount()), User::getUserAccount, qo.getUserAccount())
@@ -233,7 +244,9 @@ public class UserController {
                         .setUserName(t.getUserName())
                         .setUserAvatar(t.getUserAvatar())
                         .setUserProfile(t.getUserProfile())
-                        .setUserRole(t.getUserRole());
+                        .setUserRole(t.getUserRole())
+                        .setGmtCreate(t.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
+                        .setGmtModified(LocalDateTimeUtil.format(t.getGmtModified(), DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)));
 
                 rtList.add(rt);
             });
