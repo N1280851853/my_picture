@@ -5,8 +5,13 @@ spring:
     username: root
     password: 123456
 
-
 # accept环境下打印mp的日志
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+picture:
+  ossAccessKeyId: LTAI5tLuDREHzAUXYQeKCHzS
+  ossAccessKeySecret: FK52tV1ISHuYcap4UEXnwy0xL2z9dc
+  ossEndPoint: oss-cn-nanjing.aliyuncs.com
+  ossBucketName: whcliving

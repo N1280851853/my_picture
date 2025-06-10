@@ -215,6 +215,7 @@ public class UserController {
      * @return
      */
     @PostMapping("/listPageUser")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<PageVO<ListPageUserVO>> listPageUser(@RequestBody @Validated ListPageUserQO qo) {
         Page<User> page = userService.lambdaQuery()
                 .select(

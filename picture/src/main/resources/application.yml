@@ -22,6 +22,7 @@ mybatis-plus:
       logic-not-delete-value: 0 # 逻辑未删除值（默认是 0）
 
 
+
 knife4j:
   enable: true
   openapi:
