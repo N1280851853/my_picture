@@ -1,11 +1,4 @@
 spring:
-  cloud:
-    alicloud:
-      access-key: LTAI5tLuDREHzAUXYQeKCHzS
-      secret-key: FK52tV1ISHuYcap4UEXnwy0xL2z9dc
-      oss:
-        endpoint: oss-cn-nanjing.aliyuncs.com
-        bucket: whcliving
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/whc_picture
