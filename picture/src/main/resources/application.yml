@@ -5,7 +5,7 @@ server:
 
 spring:
   profiles:
-    active: accept
+    active: local
   application:
     name: yu-picture-backend
 
