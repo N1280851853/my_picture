@@ -10,6 +10,11 @@ import org.springframework.stereotype.Component;
 public class CosProperty {
 
     /**
+     * 当前项目名称
+     */
+    private String project;
+
+    /**
      * 域名
      */
     private String host;

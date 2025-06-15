@@ -2,7 +2,7 @@
 //
 //import cn.hutool.core.util.ObjectUtil;
 //import com.whc.picture.constant.UserConstant;
-//import com.whc.picture.entity.User;
+//import com.whc.picture.entity.user.User;
 //import com.whc.picture.exception.BusinessException;
 //import com.whc.picture.exception.ErrorCode;
 //import org.springframework.lang.Nullable;

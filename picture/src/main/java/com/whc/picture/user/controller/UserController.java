@@ -9,7 +9,7 @@ import com.whc.picture.bean.PageVO;
 import com.whc.picture.common.BaseResponse;
 import com.whc.picture.common.ResultUtils;
 import com.whc.picture.constant.UserConstant;
-import com.whc.picture.entity.User;
+import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
 import com.whc.picture.user.controller.qo.*;
@@ -62,8 +62,8 @@ public class UserController {
     public BaseResponse<Object> register(@RequestBody @Validated UserRegisterQO qo) {
         // 检测用户账号是否和数据库中已有的重复
         Long count = userService.lambdaQuery()
-                .select(User::getId)
-                .eq(User::getUserAccount, qo.getUserAccount())
+                .select(UserDO::getId)
+                .eq(UserDO::getUserAccount, qo.getUserAccount())
                 .count();
         if (count > 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
@@ -82,18 +82,10 @@ public class UserController {
      */
     @PostMapping("/get/login")
     public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request) {
-        User loginUser = userService.getLoginUser(request);
+        UserDO loginUser = userService.getLoginUser(request);
 
-        // 4. 设置返回值给前端
-        LoginUserVO vo = new LoginUserVO();
-        vo.setId(loginUser.getId())
-                .setUserAccount(loginUser.getUserAccount())
-                .setUserName(loginUser.getUserName())
-                .setUserAvatar(loginUser.getUserAvatar())
-                .setUserProfile(loginUser.getUserProfile())
-                .setUserRole(loginUser.getUserRole())
-                .setGmtCreate(loginUser.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
-                .setGmtModified(LocalDateTimeUtil.format(loginUser.getGmtModified(), DatePattern.NORM_DATETIME_PATTERN));
+        // 设置返回值给前端
+        LoginUserVO vo = userService.getUserVO(loginUser);
 
         return ResultUtils.success(vo);
     }
@@ -126,8 +118,8 @@ public class UserController {
     public BaseResponse<Object> savaUser(@RequestBody UserAddQO qo) {
         // 检测用户账号是否和数据库中已有的重复
         Long count = userService.lambdaQuery()
-                .select(User::getId)
-                .eq(User::getUserAccount, qo.getUserAccount())
+                .select(UserDO::getId)
+                .eq(UserDO::getUserAccount, qo.getUserAccount())
                 .count();
         if (count > 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
@@ -146,10 +138,10 @@ public class UserController {
      */
     @PostMapping("/getUserById")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<User> getUserById(@RequestBody @Validated UserDeleteQO qo) {
+    public BaseResponse<UserDO> getUserById(@RequestBody @Validated UserDeleteQO qo) {
         Long id = qo.getId();
-        User user = userService.lambdaQuery()
-                .eq(User::getId, id)
+        UserDO user = userService.lambdaQuery()
+                .eq(UserDO::getId, id)
                 .one();
         return ResultUtils.success(user);
     }
@@ -165,8 +157,8 @@ public class UserController {
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<ListPageUserVO> getUserVOById(@RequestBody @Validated UserDeleteQO qo) {
         Long id = qo.getId();
-        User user = userService.lambdaQuery()
-                .eq(User::getId, id)
+        UserDO user = userService.lambdaQuery()
+                .eq(UserDO::getId, id)
                 .one();
 
         // 4. 设置返回值给前端
@@ -217,24 +209,24 @@ public class UserController {
     @PostMapping("/listPageUser")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<PageVO<ListPageUserVO>> listPageUser(@RequestBody @Validated ListPageUserQO qo) {
-        Page<User> page = userService.lambdaQuery()
+        Page<UserDO> page = userService.lambdaQuery()
                 .select(
-                        User::getId,
-                        User::getUserAccount,
-                        User::getUserName,
-                        User::getUserAvatar,
-                        User::getUserProfile,
-                        User::getUserRole,
-                        User::getGmtCreate,
-                        User::getGmtModified
+                        UserDO::getId,
+                        UserDO::getUserAccount,
+                        UserDO::getUserName,
+                        UserDO::getUserAvatar,
+                        UserDO::getUserProfile,
+                        UserDO::getUserRole,
+                        UserDO::getGmtCreate,
+                        UserDO::getGmtModified
                 )
-                .likeRight(ObjectUtil.isNotEmpty(qo.getUserName()), User::getUserName, qo.getUserName())
-                .likeRight(ObjectUtil.isNotEmpty(qo.getUserAccount()), User::getUserAccount, qo.getUserAccount())
-                .likeRight(ObjectUtil.isNotEmpty(qo.getUserRole()), User::getUserRole, qo.getUserRole())
+                .likeRight(ObjectUtil.isNotEmpty(qo.getUserName()), UserDO::getUserName, qo.getUserName())
+                .likeRight(ObjectUtil.isNotEmpty(qo.getUserAccount()), UserDO::getUserAccount, qo.getUserAccount())
+                .likeRight(ObjectUtil.isNotEmpty(qo.getUserRole()), UserDO::getUserRole, qo.getUserRole())
                 .page(qo.getPage());
 
         PageVO<ListPageUserVO> vo = new PageVO<>(page.getTotal());
-        List<User> users = page.getRecords();
+        List<UserDO> users = page.getRecords();
         List<ListPageUserVO> rtList = new ArrayList<>();
 
         if (ObjectUtil.isNotEmpty(users)) {

@@ -22,7 +22,6 @@ create table if not exists user
     INDEX idx_userName (user_name)
 ) comment '用户' collate = utf8mb4_unicode_ci;
 
-
 -- 图片表
 create table if not exists picture
 (
@@ -31,19 +30,42 @@ create table if not exists picture
     name         varchar(128)                       not null comment '图片名称',
     introduction varchar(512)                       null comment '简介',
     category     varchar(64)                        null comment '分类',
-    tags         varchar(512)                      null comment '标签（JSON 数组）',
-    picSize      bigint                             null comment '图片体积',
-    picWidth     int                                null comment '图片宽度',
-    picHeight    int                                null comment '图片高度',
-    picScale     double                             null comment '图片宽高比例',
-    picFormat    varchar(32)                        null comment '图片格式',
-    userId       bigint                             not null comment '创建用户 id',
+    pic_size   bigint            null comment '图片体积',
+    pic_width  int               null comment '图片宽度',
+    pic_height int               null comment '图片高度',
+    pic_scale  double            null comment '图片宽高比例',
+    pic_format varchar(32)       null comment '图片格式',
+    user_id    bigint            not null comment '创建用户 id',
     gmt_create   datetime default CURRENT_TIMESTAMP not null comment '创建时间',
     gmt_modified   datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    isDelete     tinyint  default 0                 not null comment '是否删除',
+    is_delete  tinyint default 0 not null comment '是否删除',
     INDEX idx_name (name),                 -- 提升基于图片名称的查询性能
     INDEX idx_introduction (introduction), -- 用于模糊搜索图片简介
     INDEX idx_category (category),         -- 提升基于分类的查询性能
     INDEX idx_tags (tags),                 -- 提升基于标签的查询性能
-    INDEX idx_userId (userId)              -- 提升基于用户 ID 的查询性能
+    INDEX idx_userId (user_id)             -- 提升基于用户 ID 的查询性能
 ) comment '图片' collate = utf8mb4_unicode_ci;
+
+create table if not exists tag
+(
+    id           bigint unsigned auto_increment comment 'id' primary key,
+    tag_name     varchar(128)                       not null comment '标签名称',
+    gmt_create   datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+    gmt_modified datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    INDEX idx_name (tag_name)
+) comment '标签' collate = utf8mb4_unicode_ci;
+
+
+create table if not exists picture_tag
+(
+    id           bigint unsigned auto_increment comment 'id' primary key,
+    picture_id   bigint unsigned                    NOT NULL comment '图片ID',
+    picture_name varchar(128)                       not null comment '图片名称',
+    tag_id       bigint unsigned                    not null comment '标签Id',
+    tag_name     varchar(128)                       not null comment '标签名称',
+    gmt_create   datetime default CURRENT_TIMESTAMP not null comment '创建时间',
+    gmt_modified datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
+    is_delete    tinyint  default 0                 not null comment '是否删除',
+    INDEX idx_pictureId (picture_id), -- 基于图片id提高查询性能
+    INDEX idx_tagId (tag_id)          -- 基于标签id提高查询性能
+) comment '图片、标签关联关系表' collate = utf8mb4_unicode_ci;

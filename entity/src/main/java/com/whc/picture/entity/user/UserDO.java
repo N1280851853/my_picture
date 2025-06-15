@@ -1,11 +1,10 @@
-package com.whc.picture.entity;
+package com.whc.picture.entity.user;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 
 /**
  * 用户
@@ -14,7 +13,7 @@ import java.util.Date;
 @TableName(value ="user")
 @Data
 @Accessors(chain = true)
-public class User {
+public class UserDO {
     /**
      * id
      * 这里使用 IdType.ASSIGN_ID 让mybatis生成长整型的id

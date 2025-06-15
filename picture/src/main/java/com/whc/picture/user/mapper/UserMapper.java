@@ -1,7 +1,7 @@
 package com.whc.picture.user.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.whc.picture.entity.User;
+import com.whc.picture.entity.user.UserDO;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -11,7 +11,7 @@ import org.apache.ibatis.annotations.Mapper;
 * @Entity generator.domain.User
 */
 @Mapper
-public interface UserMapper extends BaseMapper<User> {
+public interface UserMapper extends BaseMapper<UserDO> {
 
 }
 

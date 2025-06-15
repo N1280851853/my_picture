@@ -6,7 +6,7 @@ import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whc.picture.constant.UserConstant;
 import com.whc.picture.constant.UserRoleEnum;
-import com.whc.picture.entity.User;
+import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
 import com.whc.picture.exception.ThrowUtils;
@@ -34,7 +34,7 @@ import java.time.format.DateTimeFormatter;
 @Slf4j
 @Service
 @Transactional
-public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
 
     @Override
     public LoginUserVO userLogin(UserLoginQO qo, HttpServletRequest request) {
@@ -45,19 +45,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String encryptPassword = getEncryptPassword(userPassword);
 
         // 2. 查询用户是否存在
-        User user = this.lambdaQuery()
+        UserDO user = this.lambdaQuery()
                 .select(
-                        User::getId,
-                        User::getUserAccount,
-                        User::getUserName,
-                        User::getUserAvatar,
-                        User::getUserProfile,
-                        User::getUserRole,
-                        User::getGmtCreate,
-                        User::getGmtModified
+                        UserDO::getId,
+                        UserDO::getUserAccount,
+                        UserDO::getUserName,
+                        UserDO::getUserAvatar,
+                        UserDO::getUserProfile,
+                        UserDO::getUserRole,
+                        UserDO::getGmtCreate,
+                        UserDO::getGmtModified
                 )
-                .eq(User::getUserAccount, userAccount)
-                .eq(User::getUserPassword, encryptPassword)
+                .eq(UserDO::getUserAccount, userAccount)
+                .eq(UserDO::getUserPassword, encryptPassword)
                 .one();
 
         if (ObjectUtil.isEmpty(user)) {
@@ -96,7 +96,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String encryptPassword = getEncryptPassword(userPassword);
 
         // 3. 插入数据到数据库中
-        User user = new User();
+        UserDO user = new UserDO();
         user.setUserAccount(qo.getUserAccount())
                 .setUserPassword(encryptPassword)
                 // 给一个默认用户名称
@@ -109,11 +109,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public User getLoginUser(HttpServletRequest request) {
+    public UserDO getLoginUser(HttpServletRequest request) {
         // 判断是否登录
         HttpSession session = request.getSession();
         Object userObj = session.getAttribute(UserConstant.USER_LOGIN_STATE);
-        User currentUser = (User) userObj;
+        UserDO currentUser = (UserDO) userObj;
         if (ObjectUtil.isEmpty(currentUser) || currentUser.getId() == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
@@ -143,7 +143,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public long userAdd(UserAddQO qo) {
 
         // 3. 插入数据到数据库中
-        User user = new User();
+        UserDO user = new UserDO();
         // 获取加密后的默认密码
         String encryptPassword = getEncryptPassword(DEFAULT_PASSWORD);
 
@@ -163,7 +163,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public long userUpdate(UserUpdateQO qo) {
-        User user = new User();
+        UserDO user = new UserDO();
         user.setId(qo.getId())
                 .setUserAccount(qo.getUserAccount())
                 .setUserName(qo.getUserName())
@@ -173,6 +173,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         boolean b = this.updateById(user);
         ThrowUtils.throwIf(!b, ErrorCode.OPERATION_ERROR);
         return user.getId();
+    }
+
+    @Override
+    public LoginUserVO getUserVO(UserDO userDO) {
+        LoginUserVO vo = new LoginUserVO();
+        vo.setId(userDO.getId())
+                .setUserAccount(userDO.getUserAccount())
+                .setUserName(userDO.getUserName())
+                .setUserAvatar(userDO.getUserAvatar())
+                .setUserProfile(userDO.getUserProfile())
+                .setUserRole(userDO.getUserRole())
+                .setGmtCreate(userDO.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
+                .setGmtModified(LocalDateTimeUtil.format(userDO.getGmtModified(), DatePattern.NORM_DATETIME_PATTERN));
+        return vo;
+    }
+
+    @Override
+    public boolean isAdmin(UserDO userDO) {
+        return userDO != null && UserRoleEnum.ADMIN.getValue().equals(userDO.getUserRole());
     }
 
 

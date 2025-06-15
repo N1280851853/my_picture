@@ -2,7 +2,7 @@ package com.whc.picture.aop;
 
 import com.whc.picture.annotation.AuthCheck;
 import com.whc.picture.constant.UserRoleEnum;
-import com.whc.picture.entity.User;
+import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
 import com.whc.picture.user.service.UserService;
@@ -37,7 +37,7 @@ public class AuthInterceptor {
         HttpServletRequest request = ((ServletRequestAttributes) requestAttributes).getRequest();
 
         // 获取当前登录用户
-        User loginUser = userService.getLoginUser(request);
+        UserDO loginUser = userService.getLoginUser(request);
         UserRoleEnum mustRoleEnum = UserRoleEnum.getUserRokeEnum(mustRole);
         // 如果不需要权限，放行
         if (mustRoleEnum == null) {

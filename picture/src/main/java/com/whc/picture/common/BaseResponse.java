@@ -42,4 +42,19 @@ public class BaseResponse<T> implements Serializable {
     public BaseResponse(ErrorCode errorCode) {
         this(errorCode.getCode(), null, errorCode.getMessage());
     }
+
+    public BaseResponse(ErrorCode errorCode, String message) {
+        this(errorCode.getCode(), null, errorCode.getMessage());
+    }
+
+    /**
+     * 一些常用的错误返回值
+     *
+     * @param message
+     * @param <T>
+     * @return
+     */
+    public static <T> BaseResponse<T> businessException(String message) {
+        return new BaseResponse<>(ErrorCode.OPERATION_ERROR, message);
+    }
 }

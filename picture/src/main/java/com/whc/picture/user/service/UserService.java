@@ -1,7 +1,7 @@
 package com.whc.picture.user.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.whc.picture.entity.User;
+import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.user.controller.qo.UserAddQO;
 import com.whc.picture.user.controller.qo.UserLoginQO;
 import com.whc.picture.user.controller.qo.UserRegisterQO;
@@ -15,7 +15,7 @@ import javax.servlet.http.HttpServletRequest;
 * @description 针对表【user(用户)】的数据库操作Service
 * @createDate 2025-05-28 20:12:17
 */
-public interface UserService extends IService<User> {
+public interface UserService extends IService<UserDO> {
 
     String DEFAULT_PASSWORD = "12345678";
 
@@ -38,7 +38,7 @@ public interface UserService extends IService<User> {
      * @param request
      * @return
      */
-    User getLoginUser(HttpServletRequest request);
+    UserDO getLoginUser(HttpServletRequest request);
 
     /**
      * 获取加密后的密码
@@ -60,4 +60,21 @@ public interface UserService extends IService<User> {
      * @return
      */
     long userUpdate(UserUpdateQO qo);
+
+    /**
+     * 获取user脱敏后的信息
+     *
+     * @param userDO
+     * @return
+     */
+    LoginUserVO getUserVO(UserDO userDO);
+
+    /**
+     * 是否为管理员
+     *
+     * @param userDO
+     * @return
+     */
+    boolean isAdmin(UserDO userDO);
+
 }
