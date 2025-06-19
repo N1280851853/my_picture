@@ -40,9 +40,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, PictureDO>
     private PictureTagService pictureTagService;
 
     @Override
-    public PictureDO uploadPicture(PictureQO pictureQO, UserDO loginUser) {
+    public PictureDO uploadPicture(MultipartFile multipartFile, PictureQO pictureQO, UserDO loginUser) {
         Long id = pictureQO.getId();
-        MultipartFile multipartFile = pictureQO.getImage();
 
         // 校验参数
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);

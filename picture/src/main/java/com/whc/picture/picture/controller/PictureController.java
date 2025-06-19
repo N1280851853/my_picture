@@ -2,6 +2,7 @@ package com.whc.picture.picture.controller;
 
 import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.whc.picture.annotation.AuthCheck;
 import com.whc.picture.bean.PageVO;
@@ -16,6 +17,7 @@ import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
 import com.whc.picture.exception.ThrowUtils;
 import com.whc.picture.picture.controller.qo.*;
+import com.whc.picture.picture.controller.vo.ListPagePictureVO;
 import com.whc.picture.picture.controller.vo.PictureVO;
 import com.whc.picture.picture.service.PictureService;
 import com.whc.picture.picture.service.PictureTagService;
@@ -25,6 +27,7 @@ import com.whc.picture.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -63,10 +66,10 @@ public class PictureController {
      */
     @PostMapping("/upload")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<PictureVO> uploadPicture(PictureQO pictureQO, HttpServletRequest request) {
+    public BaseResponse<PictureVO> uploadPicture(@RequestPart("file") MultipartFile multipartFile, PictureQO pictureQO, HttpServletRequest request) {
         UserDO userDO = userService.getLoginUser(request);
         LoginUserVO loginUser = userService.getUserVO(userDO);
-        PictureDO pictureDO = pictureService.uploadPicture(pictureQO, userDO);
+        PictureDO pictureDO = pictureService.uploadPicture(multipartFile, pictureQO, userDO);
         PictureVO vo = new PictureVO();
         vo.setId(pictureDO.getId())
                 .setUrl(pictureDO.getUrl())
@@ -165,7 +168,7 @@ public class PictureController {
      */
     @PostMapping("/listPagePicture")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<PageVO<PictureDO>> listPagePicture(@RequestBody ListPagePictureQO qo) {
+    public BaseResponse<PageVO<ListPagePictureVO>> listPagePicture(@RequestBody ListPagePictureQO qo) {
         Long id = qo.getId();
         String name = qo.getName();
         String introduction = qo.getIntroduction();
@@ -180,7 +183,7 @@ public class PictureController {
         LocalDateTime startUploadTime = qo.getStartUploadTime();
         LocalDateTime endUploadTime = qo.getEndUploadTime();
 
-        PageVO<PictureDO> pageVO = new PageVO<>();
+        PageVO<ListPagePictureVO> pageVO = new PageVO<>();
 
         List<String> tags = qo.getTags();
         Set<Long> pictureIds = new HashSet<>();
@@ -244,7 +247,41 @@ public class PictureController {
 
         pageVO.setTotalRow(page.getTotal());
 
-        pageVO.setList(page.getRecords());
+        List<ListPagePictureVO> rtList = new ArrayList<>();
+        List<PictureDO> pictureList = page.getRecords();
+
+        List<Long> pictureIdList = pictureList.stream().map(PictureDO::getId).toList();
+        Map<Long, List<PictureTagDO>> pictureTagMap = pictureTagService.lambdaQuery()
+                .select(PictureTagDO::getPictureId, PictureTagDO::getTagName)
+                .in(PictureTagDO::getPictureId, pictureIdList)
+                .list()
+                .stream()
+                .collect(Collectors.groupingBy(PictureTagDO::getPictureId));
+
+        pictureList.forEach(t -> {
+            List<PictureTagDO> pictureTagDOS = pictureTagMap.get(t.getId());
+            pictureTagDOS = Optional.ofNullable(pictureTagDOS).orElse(new ArrayList<>());
+            List<String> tagNameList = pictureTagDOS.stream().map(PictureTagDO::getTagName).toList();
+            ListPagePictureVO vo = new ListPagePictureVO();
+            vo.setId(t.getId())
+                    .setUrl(t.getUrl())
+                    .setName(t.getName())
+                    .setIntroduction(t.getIntroduction())
+                    .setTags(JSONUtil.toJsonStr(tagNameList))
+                    .setCategory(t.getCategory())
+                    .setPicSize(t.getPicSize())
+                    .setPicWidth(t.getPicWidth())
+                    .setPicHeight(t.getPicHeight())
+                    .setPicScale(t.getPicScale())
+                    .setPicFormat(t.getPicFormat())
+                    .setUserId(t.getUserId())
+                    .setGmtCreate(t.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
+                    .setGmtModified(t.getGmtModified().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)));
+            rtList.add(vo);
+
+        });
+
+        pageVO.setList(rtList);
 
         return ResultUtils.success(pageVO);
     }

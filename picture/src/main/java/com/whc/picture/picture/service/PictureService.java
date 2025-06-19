@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.picture.controller.qo.PictureQO;
 import com.whc.picture.picture.controller.qo.PictureUpdateQO;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
 * @author simceredx
@@ -20,7 +21,7 @@ public interface PictureService extends IService<PictureDO> {
      * @param loginUser
      * @return
      */
-    PictureDO uploadPicture(PictureQO pictureQO,
+    PictureDO uploadPicture(MultipartFile multipartFile, PictureQO pictureQO,
                             UserDO loginUser);
 
 
