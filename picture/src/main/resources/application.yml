@@ -16,7 +16,7 @@ mybatis-plus:
   configuration:
     # MyBatis 配置
     map-underscore-to-camel-case: true
-    #查询出来的属性如果为null值，默认是不返回这个属性字段的，需要配置为true
+    #查询出来的属性如果为null值，默认是不返回这个属性字段的，需要配置为true,使其返回
     call-setters-on-nulls: true
   global-config:
     db-config:

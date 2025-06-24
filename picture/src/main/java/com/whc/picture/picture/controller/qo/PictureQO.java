@@ -11,4 +11,9 @@ public class PictureQO {
      */
     private Long id;
 
+    /**
+     * 文件 url 路径
+     */
+    private String fileUrl;
+
 }

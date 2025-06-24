@@ -42,7 +42,6 @@ create table if not exists picture
     INDEX idx_name (name),                 -- 提升基于图片名称的查询性能
     INDEX idx_introduction (introduction), -- 用于模糊搜索图片简介
     INDEX idx_category (category),         -- 提升基于分类的查询性能
-    INDEX idx_tags (tags),                 -- 提升基于标签的查询性能
     INDEX idx_userId (user_id)             -- 提升基于用户 ID 的查询性能
 ) comment '图片' collate = utf8mb4_unicode_ci;
 
@@ -69,3 +68,14 @@ create table if not exists picture_tag
     INDEX idx_pictureId (picture_id), -- 基于图片id提高查询性能
     INDEX idx_tagId (tag_id)          -- 基于标签id提高查询性能
 ) comment '图片、标签关联关系表' collate = utf8mb4_unicode_ci;
+
+
+ALTER TABLE picture
+    -- 添加新列
+    ADD COLUMN `review_status` TINYINT unsigned DEFAULT 0 NOT NULL COMMENT '审核状态：0-待审核; 1-通过; 2-拒绝' after `user_id`,
+    ADD COLUMN `review_message` VARCHAR(512) NULL COMMENT '审核信息' after `review_status`,
+    ADD COLUMN `reviewer_id` BIGINT NULL COMMENT '审核人 ID' after `review_message`,
+    ADD COLUMN `review_time` DATETIME NULL COMMENT '审核时间' after `reviewer_id`;
+
+-- 创建基于 review_status 列的索引
+CREATE INDEX idx_reviewStatus ON picture (review_status);

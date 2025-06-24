@@ -1,6 +1,7 @@
 package com.whc.picture.picture.controller;
 
 import cn.hutool.core.date.DatePattern;
+import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -9,6 +10,7 @@ import com.whc.picture.bean.PageVO;
 import com.whc.picture.common.BaseResponse;
 import com.whc.picture.common.ResultUtils;
 import com.whc.picture.constant.UserConstant;
+import com.whc.picture.entity.picture.common.PictureReviewStatusEnum;
 import com.whc.picture.entity.picture.entity.PictureDO;
 import com.whc.picture.entity.picture.entity.PictureTagDO;
 import com.whc.picture.entity.tag.entity.TagDO;
@@ -65,11 +67,39 @@ public class PictureController {
      * @return
      */
     @PostMapping("/upload")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<PictureVO> uploadPicture(@RequestPart("file") MultipartFile multipartFile, PictureQO pictureQO, HttpServletRequest request) {
         UserDO userDO = userService.getLoginUser(request);
         LoginUserVO loginUser = userService.getUserVO(userDO);
         PictureDO pictureDO = pictureService.uploadPicture(multipartFile, pictureQO, userDO);
+        PictureVO vo = new PictureVO();
+        vo.setId(pictureDO.getId())
+                .setUrl(pictureDO.getUrl())
+                .setName(pictureDO.getName())
+                .setIntroduction(pictureDO.getIntroduction())
+                .setPicSize(pictureDO.getPicSize())
+                .setPicWidth(pictureDO.getPicWidth())
+                .setPicHeight(pictureDO.getPicHeight())
+                .setPicScale(pictureDO.getPicScale())
+                .setPicFormat(pictureDO.getPicFormat())
+                .setUserId(loginUser.getId())
+                .setUser(loginUser);
+
+        return ResultUtils.success(vo);
+    }
+
+    /**
+     * 通过url 上传图片(可重新上传)
+     *
+     * @param pictureQO
+     * @param request
+     * @return
+     */
+    @PostMapping("/uploadByUrl")
+    public BaseResponse<PictureVO> uploadPictureByUrl(@RequestBody PictureQO pictureQO, HttpServletRequest request) {
+        String fileUrl = pictureQO.getFileUrl();
+        UserDO userDO = userService.getLoginUser(request);
+        LoginUserVO loginUser = userService.getUserVO(userDO);
+        PictureDO pictureDO = pictureService.uploadPicture(fileUrl, pictureQO, userDO);
         PictureVO vo = new PictureVO();
         vo.setId(pictureDO.getId())
                 .setUrl(pictureDO.getUrl())
@@ -90,14 +120,24 @@ public class PictureController {
 
     /**
      * 更新图片信息
-     *
      * @param qo
+     * @param request
      * @return
      */
     @PostMapping("/updatePicture")
-    public BaseResponse<Object> updatePicture(@RequestBody @Validated PictureUpdateQO qo) {
+    public BaseResponse<Object> updatePicture(@RequestBody @Validated PictureUpdateQO qo, HttpServletRequest request) {
 
-        pictureService.updatePicture(qo);
+        UserDO loginUser = userService.getLoginUser(request);
+        PictureDO oldPictureDO = pictureService.lambdaQuery()
+                .select(PictureDO::getId, PictureDO::getUserId)
+                .eq(PictureDO::getId, qo.getId())
+                .one();
+        // 仅本人和管理员可编辑图片
+        if (!oldPictureDO.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+
+        pictureService.updatePicture(qo, loginUser);
 
         return ResultUtils.success();
     }
@@ -131,7 +171,10 @@ public class PictureController {
         Long pictureId = qo.getId();
         PictureDO pictureDO = pictureService.lambdaQuery()
                 .eq(PictureDO::getId, pictureId)
+                // 防止普通用户直接根据id获取到未审核通过的图片，这里加一个条件
+                .eq(PictureDO::getReviewStatus, PictureReviewStatusEnum.PASS.getValue())
                 .one();
+        ThrowUtils.throwIf(ObjectUtil.isEmpty(pictureDO), ErrorCode.PARAMS_ERROR);
 
         Long userId = pictureDO.getUserId();
         PictureVO vo = new PictureVO();
@@ -180,6 +223,8 @@ public class PictureController {
         String picFormat = qo.getPicFormat();
         String searchText = qo.getSearchText();
         Long userId = qo.getUserId();
+        Integer reviewStatus = qo.getReviewStatus();
+        Long reviewerId = qo.getReviewerId();
         LocalDateTime startUploadTime = qo.getStartUploadTime();
         LocalDateTime endUploadTime = qo.getEndUploadTime();
 
@@ -221,6 +266,10 @@ public class PictureController {
                         PictureDO::getPicScale,
                         PictureDO::getPicFormat,
                         PictureDO::getUserId,
+                        PictureDO::getReviewStatus,
+                        PictureDO::getReviewerId,
+                        PictureDO::getReviewMessage,
+                        PictureDO::getReviewTime,
                         PictureDO::getGmtCreate,
                         PictureDO::getGmtModified
                 )
@@ -231,6 +280,8 @@ public class PictureController {
                 .eq(ObjectUtil.isNotEmpty(picHeight), PictureDO::getPicHeight, picHeight)
                 .eq(ObjectUtil.isNotEmpty(picSize), PictureDO::getPicSize, picSize)
                 .eq(ObjectUtil.isNotEmpty(picScale), PictureDO::getPicScale, picScale)
+                .eq(ObjectUtil.isNotEmpty(reviewStatus), PictureDO::getReviewStatus, reviewStatus)
+                .eq(ObjectUtil.isNotEmpty(reviewerId), PictureDO::getReviewerId, reviewerId)
                 .in(ObjectUtil.isNotEmpty(pictureIds), PictureDO::getId, pictureIds)
                 .like(ObjectUtil.isNotEmpty(name), PictureDO::getName, name)
                 .like(ObjectUtil.isNotEmpty(introduction), PictureDO::getIntroduction, introduction)
@@ -249,6 +300,9 @@ public class PictureController {
 
         List<ListPagePictureVO> rtList = new ArrayList<>();
         List<PictureDO> pictureList = page.getRecords();
+        if (ObjectUtil.isEmpty(pictureList)) {
+            return ResultUtils.success(pageVO);
+        }
 
         List<Long> pictureIdList = pictureList.stream().map(PictureDO::getId).toList();
         Map<Long, List<PictureTagDO>> pictureTagMap = pictureTagService.lambdaQuery()
@@ -275,6 +329,10 @@ public class PictureController {
                     .setPicScale(t.getPicScale())
                     .setPicFormat(t.getPicFormat())
                     .setUserId(t.getUserId())
+                    .setReviewStatus(t.getReviewStatus())
+                    .setReviewMessage(t.getReviewMessage())
+                    .setReviewerId(t.getReviewerId())
+                    .setReviewTime(LocalDateTimeUtil.format(t.getReviewTime(), DatePattern.NORM_DATETIME_PATTERN))
                     .setGmtCreate(t.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
                     .setGmtModified(t.getGmtModified().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)));
             rtList.add(vo);
@@ -302,6 +360,12 @@ public class PictureController {
         String picFormat = qo.getPicFormat();
         String searchText = qo.getSearchText();
         Long userId = qo.getUserId();
+        Integer reviewStatus = qo.getReviewStatus();
+        // 普通用户只能看到审核通过的数据
+        reviewStatus = PictureReviewStatusEnum.PASS.getValue();
+        Long reviewerId = qo.getReviewerId();
+        String reviewMessage = qo.getReviewMessage();
+        Date reviewTime = qo.getReviewTime();
         LocalDateTime startUploadTime = qo.getStartUploadTime();
         LocalDateTime endUploadTime = qo.getEndUploadTime();
 
@@ -343,6 +407,10 @@ public class PictureController {
                         PictureDO::getPicScale,
                         PictureDO::getPicFormat,
                         PictureDO::getUserId,
+                        PictureDO::getReviewStatus,
+                        PictureDO::getReviewerId,
+                        PictureDO::getReviewMessage,
+                        PictureDO::getReviewTime,
                         PictureDO::getGmtCreate,
                         PictureDO::getGmtModified
                 )
@@ -353,6 +421,8 @@ public class PictureController {
                 .eq(ObjectUtil.isNotEmpty(picHeight), PictureDO::getPicHeight, picHeight)
                 .eq(ObjectUtil.isNotEmpty(picSize), PictureDO::getPicSize, picSize)
                 .eq(ObjectUtil.isNotEmpty(picScale), PictureDO::getPicScale, picScale)
+                .eq(ObjectUtil.isNotEmpty(reviewStatus), PictureDO::getReviewStatus, reviewStatus)
+                .eq(ObjectUtil.isNotEmpty(reviewerId), PictureDO::getReviewerId, reviewerId)
                 .in(ObjectUtil.isNotEmpty(pictureIds), PictureDO::getId, pictureIds)
                 .like(ObjectUtil.isNotEmpty(name), PictureDO::getName, name)
                 .like(ObjectUtil.isNotEmpty(introduction), PictureDO::getIntroduction, introduction)
@@ -445,5 +515,24 @@ public class PictureController {
         return ResultUtils.success();
     }
 
+    /**
+     * 图片审核
+     * @param qo
+     * @return
+     */
+    @PostMapping("/reviewPicture")
+    public BaseResponse<Object> reviewPicture(@RequestBody PictureReviewQO qo,HttpServletRequest request) {
+        PictureDO pictureDO = pictureService.lambdaQuery()
+                .select(PictureDO::getId)
+                .eq(PictureDO::getId, qo.getId())
+                .one();
+        ThrowUtils.throwIf(ObjectUtil.isEmpty(pictureDO), ErrorCode.NOT_FOUND_ERROR);
+
+        UserDO loginUser = userService.getLoginUser(request);
+
+        pictureService.doPictureReview(qo, loginUser);
+
+        return ResultUtils.success();
+    }
 
 }

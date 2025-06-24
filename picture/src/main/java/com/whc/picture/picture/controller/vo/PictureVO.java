@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.experimental.Accessors;
 
 import java.io.Serializable;
+import java.util.Date;
 import java.util.List;
 
 @Data
@@ -71,6 +72,26 @@ public class PictureVO implements Serializable {
      * 用户 id
      */
     private Long userId;
+
+    /**
+     * 状态：待审核; 通过; 拒绝
+     */
+    private String reviewStatus;
+
+    /**
+     * 审核信息
+     */
+    private String reviewMessage;
+
+    /**
+     * 审核人 id
+     */
+    private Long reviewerId;
+
+    /**
+     * 审核时间
+     */
+    private Date reviewTime;
 
     /**
      * 创建时间

@@ -4,6 +4,7 @@ import com.whc.picture.entity.picture.entity.PictureDO;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.picture.controller.qo.PictureQO;
+import com.whc.picture.picture.controller.qo.PictureReviewQO;
 import com.whc.picture.picture.controller.qo.PictureUpdateQO;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,11 +18,11 @@ public interface PictureService extends IService<PictureDO> {
     /**
      * 上传图片
      *
-     * @param pictureQO
+     * @param inputSource
      * @param loginUser
      * @return
      */
-    PictureDO uploadPicture(MultipartFile multipartFile, PictureQO pictureQO,
+    PictureDO uploadPicture(Object inputSource, PictureQO pictureQO,
                             UserDO loginUser);
 
 
@@ -29,5 +30,19 @@ public interface PictureService extends IService<PictureDO> {
      * 更新图片信息
      * @param qo
      */
-    void updatePicture(PictureUpdateQO qo);
+    void updatePicture(PictureUpdateQO qo, UserDO loginUser);
+
+    /**
+     * 图片审核
+     * @param qo
+     * @param loginUser
+     */
+    void doPictureReview(PictureReviewQO qo, UserDO loginUser);
+
+    /**
+     * 填充审核参数
+     * @param pictureDO
+     * @param loginUser
+     */
+    void fillReviewParams(PictureDO pictureDO, UserDO loginUser);
 }

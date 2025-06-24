@@ -1,32 +1,31 @@
 package com.whc.picture.manager;
 
-import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.NumberUtil;
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.RandomUtil;
-import com.qcloud.cos.COSClient;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpResponse;
+import cn.hutool.http.HttpStatus;
+import cn.hutool.http.HttpUtil;
+import cn.hutool.http.Method;
 import com.qcloud.cos.model.PutObjectResult;
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;
-import com.qcloud.cos.model.ciModel.persistence.OriginalInfo;
-import com.whc.picture.common.ResultUtils;
-import com.whc.picture.config.CosClientConfig;
-import com.whc.picture.entity.picture.common.PictureCommon;
 import com.whc.picture.entity.picture.entity.PictureDO;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
 import com.whc.picture.exception.ThrowUtils;
 import com.whc.picture.gateway.property.CosProperty;
 import lombok.extern.slf4j.Slf4j;
-import org.joda.time.format.DateTimeFormatter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -37,6 +36,7 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@Deprecated
 public class FileManager {
 
     @Resource
@@ -102,7 +102,6 @@ public class FileManager {
             deleteTmpFile(file);
         }
 
-
     }
 
 
@@ -133,6 +132,113 @@ public class FileManager {
             boolean deleteRes = file.delete();
             if (!deleteRes) {
                 log.error("file delete error, filePath:{}", file.getAbsolutePath());
+            }
+        }
+    }
+
+    // TODO 新增的方法
+
+    /**
+     * 通过url上次图片
+     * @param fileUrl
+     * @param uploadPathPrefix
+     * @return
+     */
+    public PictureDO uploadPictureByUrl(String fileUrl, String uploadPathPrefix) {
+        // 校验图片
+        //validPicture(multipartFile);
+        validPicture(fileUrl);
+
+
+        // 图片上传地址
+        String uuid = RandomUtil.randomString(16);
+        String originalFilename = FileUtil.mainName(fileUrl);
+
+        // 这里有个小细节就是说图片文件的原始名称可能是和url地址有冲突的，自己拼接文件上传名称，而不是原始文件名称，可以增加安全性
+        String uploadFileName = String.format("%s_%s.%s", DateUtil.formatDate(new Date()), uuid, FileUtil.getSuffix(originalFilename));
+        // 上传路径  /项目名称/前缀/文件名称
+        String uploadPath = String.format("/%s/%s/%s", cosProperty.getProject(), uploadPathPrefix, uploadFileName);
+
+        File file = null;
+        try {
+            file = File.createTempFile(uploadPath, null);
+            // 先下载
+            HttpUtil.downloadFile(fileUrl, file);
+            // 上传文件
+            PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
+            // 获取图片原始信息
+            ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+
+            // 计算宽高比
+            int picWidth = imageInfo.getWidth();
+            int picHeight = imageInfo.getHeight();
+            double picScale = NumberUtil.round(picWidth * 1.0 / picHeight , 2).doubleValue();
+
+            PictureDO pictureDO = new PictureDO();
+            pictureDO.setUrl(cosProperty.getHost() + uploadPath)
+                    .setName(FileUtil.mainName(originalFilename))
+                    .setPicSize(FileUtil.size(file))
+                    .setPicWidth(picWidth)
+                    .setPicHeight(picHeight)
+                    .setPicScale(picScale)
+                    .setPicFormat(imageInfo.getFormat());
+
+            return pictureDO;
+        } catch (IOException e) {
+            log.error("file upload error, filePath:{}", uploadPath, e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+        } finally {
+            // 临时文件清理
+            deleteTmpFile(file);
+        }
+
+
+    }
+
+    /**
+     * 根据 url 检验文件
+     * @param fileUrl
+     */
+    private void validPicture(String fileUrl) {
+        // 1.检验非空
+        ThrowUtils.throwIf(ObjectUtil.isEmpty(fileUrl), ErrorCode.PARAMS_ERROR, "文件地址为空");
+
+        // 2.校验 URL 格式
+        try {
+            new URL(fileUrl);
+        } catch (MalformedURLException e) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件地址格式不正确");
+        }
+
+        // 3.校验 URL 的协议
+        ThrowUtils.throwIf(!fileUrl.startsWith("http://") && !fileUrl.startsWith("https://"),
+                ErrorCode.PARAMS_ERROR, "仅支持 http 和 https 协议的文件地址");
+
+        // 发送 HEAD 请求验证文件是否存在,这里需要注意释放资源，因此采用 try-with-resource的方式使其自动释放
+        try (HttpResponse httpResponse = HttpUtil.createRequest(Method.HEAD, fileUrl).execute();) {
+            // 未正常返回，无需执行其他判断
+            if (httpResponse.getStatus() != HttpStatus.HTTP_OK) {
+                // 这里直接返回而不是抛异常，是因为有一些文件服务器是不支持head请求的，其返回值可能并不是 HttpStatus.HTTP_OK
+                // 但这并不能表示文件不存在
+                return;
+            }
+            // 4. 校验文件类型
+            String contentType = httpResponse.header("Content-Type");
+            if (StrUtil.isNotBlank(contentType)) {
+                // 允许的图片类型
+                final List<String> ALLOW_CONTENT_TYPES = Arrays.asList("image/jpeg", "image/jpg", "image/png", "image/webp");
+                ThrowUtils.throwIf(!ALLOW_CONTENT_TYPES.contains(contentType.toLowerCase()),
+                        ErrorCode.PARAMS_ERROR, "文件类型错误");
+            }
+            // 5. 校验文件大小
+            String contentLengthStr = httpResponse.header("Content-Length");
+            if (StrUtil.isNotBlank(contentLengthStr)) {
+                try {
+                    long contentLength = Long.parseLong(contentLengthStr);
+                    ThrowUtils.throwIf(contentLength > 2 * ONE_MB, ErrorCode.PARAMS_ERROR, "文件大小不能超出2MB");
+                } catch (NumberFormatException e) {
+                    throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件大小格式错误");
+                }
             }
         }
     }
