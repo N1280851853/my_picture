@@ -1,5 +1,6 @@
 package com.whc.picture.picture.service.impl;
 
+import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whc.picture.entity.picture.entity.PictureTagDO;
 import com.whc.picture.picture.service.PictureTagService;
@@ -13,13 +14,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
-* @author simceredx
-* @description 针对表【picture_tag(图片、标签关联关系表)】的数据库操作Service实现
-* @createDate 2025-06-14 18:22:13
-*/
+ * @author simceredx
+ * @description 针对表【picture_tag(图片、标签关联关系表)】的数据库操作Service实现
+ * @createDate 2025-06-14 18:22:13
+ */
 @Service
 public class PictureTagServiceImpl extends ServiceImpl<PictureTagMapper, PictureTagDO>
-    implements PictureTagService{
+        implements PictureTagService {
 
     @Resource
     private TagService tagService;
@@ -34,6 +35,9 @@ public class PictureTagServiceImpl extends ServiceImpl<PictureTagMapper, Picture
 
     @Override
     public void savePictureRelationTag(Long pictureId, String pictureName, List<String> tags) {
+        if (ObjectUtil.isEmpty(tags)) {
+            return;
+        }
         Map<String, Long> allTagMap = tagService.getAllTagMap();
         List<PictureTagDO> insertDOS = new ArrayList<>();
         tags.forEach(tag -> {

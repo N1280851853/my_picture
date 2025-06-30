@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
 @TableName(value ="user")
 @Data
 @Accessors(chain = true)
-public class UserDO {
+public class UserDO implements Serializable {
     /**
      * id
      * 这里使用 IdType.ASSIGN_ID 让mybatis生成长整型的id

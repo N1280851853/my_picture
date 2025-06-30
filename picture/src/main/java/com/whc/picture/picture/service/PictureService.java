@@ -6,7 +6,7 @@ import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.picture.controller.qo.PictureQO;
 import com.whc.picture.picture.controller.qo.PictureReviewQO;
 import com.whc.picture.picture.controller.qo.PictureUpdateQO;
-import org.springframework.web.multipart.MultipartFile;
+import com.whc.picture.picture.controller.qo.PictureUploadByBatchQO;
 
 /**
 * @author simceredx
@@ -45,4 +45,18 @@ public interface PictureService extends IService<PictureDO> {
      * @param loginUser
      */
     void fillReviewParams(PictureDO pictureDO, UserDO loginUser);
+
+    /**
+     * 批量上传图片
+     * @param qo
+     * @param loginUser
+     * @return
+     */
+    Integer uploadPictureByBatch(PictureUploadByBatchQO qo, UserDO loginUser);
+
+    /**
+     * 清理图片文件
+     * @param oldPicture
+     */
+    void clearPictureFile(PictureDO oldPicture);
 }

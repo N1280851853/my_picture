@@ -2,15 +2,25 @@ server:
   port: 8123
   servlet:
     context-path: /api
-    multipart:
-      max-file-size: 5MB   # 设置单个文件最大大小
-      max-request-size: 10MB  # 设置总上传大小（多个文件时）
+    # cookie 30天后过期
+    session:
+      cookie:
+        max-age: 2592000
 
 spring:
   profiles:
     active: local
   application:
     name: yu-picture-backend
+  servlet:
+    multipart:
+      max-file-size: 5MB   # 设置单个文件最大大小
+      max-request-size: 10MB  # 设置总上传大小（多个文件时）
+  # session 配置
+  session:
+    store-type: redis
+    # 30天后过期
+    timeout: 2592000
 
 mybatis-plus:
   configuration:

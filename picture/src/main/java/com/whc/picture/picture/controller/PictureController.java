@@ -18,6 +18,9 @@ import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
 import com.whc.picture.exception.ThrowUtils;
+import com.whc.picture.manager.pagecache.LocalCache;
+import com.whc.picture.manager.pagecache.PagePictureCacheTemplate;
+import com.whc.picture.manager.pagecache.RedisCache;
 import com.whc.picture.picture.controller.qo.*;
 import com.whc.picture.picture.controller.vo.ListPagePictureVO;
 import com.whc.picture.picture.controller.vo.PictureVO;
@@ -27,6 +30,8 @@ import com.whc.picture.tag.service.TagService;
 import com.whc.picture.user.controller.vo.LoginUserVO;
 import com.whc.picture.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.DigestUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -58,6 +63,15 @@ public class PictureController {
 
     @Resource
     private TagService tagService;
+
+    @Resource
+    private LocalCache localCache;
+
+    @Resource
+    private RedisCache redisCache;
+
+    @Value("${spring.profiles.active}")
+    private String env;
 
     /**
      * 上传图片(可重新上传)
@@ -117,30 +131,6 @@ public class PictureController {
 
     }
 
-
-    /**
-     * 更新图片信息
-     * @param qo
-     * @param request
-     * @return
-     */
-    @PostMapping("/updatePicture")
-    public BaseResponse<Object> updatePicture(@RequestBody @Validated PictureUpdateQO qo, HttpServletRequest request) {
-
-        UserDO loginUser = userService.getLoginUser(request);
-        PictureDO oldPictureDO = pictureService.lambdaQuery()
-                .select(PictureDO::getId, PictureDO::getUserId)
-                .eq(PictureDO::getId, qo.getId())
-                .one();
-        // 仅本人和管理员可编辑图片
-        if (!oldPictureDO.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
-
-        pictureService.updatePicture(qo, loginUser);
-
-        return ResultUtils.success();
-    }
 
     /**
      * 根据ID获取图片（仅管理员可用）
@@ -398,6 +388,7 @@ public class PictureController {
                 .select(
                         PictureDO::getId,
                         PictureDO::getUrl,
+                        PictureDO::getThumbnailUrl,
                         PictureDO::getName,
                         PictureDO::getIntroduction,
                         PictureDO::getCategory,
@@ -461,6 +452,7 @@ public class PictureController {
                 PictureVO vo = new PictureVO();
                 vo.setId(t.getId())
                         .setUrl(t.getUrl())
+                        .setThumbnailUrl(t.getThumbnailUrl())
                         .setName(t.getName())
                         .setIntroduction(t.getIntroduction())
                         .setTags(tagNameList)
@@ -485,6 +477,202 @@ public class PictureController {
     }
 
     /**
+     * 分页获取图片列表-有缓存（仅普通用户可用）
+     */
+    @PostMapping("/listPagePictureVOByCache")
+    public BaseResponse<PageVO<PictureVO>> listPagePictureVOByCache(@RequestBody ListPagePictureQO qo) {
+        Long id = qo.getId();
+        String name = qo.getName();
+        String introduction = qo.getIntroduction();
+        String category = qo.getCategory();
+        Long picSize = qo.getPicSize();
+        Integer picWidth = qo.getPicWidth();
+        Integer picHeight = qo.getPicHeight();
+        Double picScale = qo.getPicScale();
+        String picFormat = qo.getPicFormat();
+        String searchText = qo.getSearchText();
+        Long userId = qo.getUserId();
+        Integer reviewStatus = qo.getReviewStatus();
+        // 普通用户只能看到审核通过的数据
+        reviewStatus = PictureReviewStatusEnum.PASS.getValue();
+        Long reviewerId = qo.getReviewerId();
+        String reviewMessage = qo.getReviewMessage();
+        Date reviewTime = qo.getReviewTime();
+        LocalDateTime startUploadTime = qo.getStartUploadTime();
+        LocalDateTime endUploadTime = qo.getEndUploadTime();
+
+        PageVO<PictureVO> pageVO = new PageVO<>();
+
+        List<String> tags = qo.getTags();
+        Set<Long> pictureIds = new HashSet<>();
+        if (ObjectUtil.isNotEmpty(tags)) {
+            List<TagDO> list = tagService.lambdaQuery()
+                    .select(TagDO::getId)
+                    .in(TagDO::getTagName, tags)
+                    .list();
+            if (ObjectUtil.isEmpty(list)) {
+                // 输入的标签在数据库中没有查询到，则直接返回
+                return ResultUtils.success(pageVO);
+            }
+            Set<Long> tagIds = list.stream().map(TagDO::getId).collect(Collectors.toSet());
+            List<PictureTagDO> pictureTagDOS = pictureTagService.lambdaQuery()
+                    .select(PictureTagDO::getPictureId)
+                    .in(PictureTagDO::getTagId, tagIds)
+                    .list();
+            if (ObjectUtil.isEmpty(pictureTagDOS)) {
+                // 输入的标签没有关联任何图片，则直接返回
+                return ResultUtils.success(pageVO);
+            }
+            pictureIds = pictureTagDOS.stream().map(PictureTagDO::getPictureId).collect(Collectors.toSet());
+        }
+
+        // 查询缓存、缓存里面没有再去查询数据库
+        // 构建缓存的key
+        String queryCondition = JSONUtil.toJsonStr(qo);
+        // 将查询条件进行MD5加密，然后截取一段较短的字符当key
+        String hashKey = DigestUtils.md5DigestAsHex(queryCondition.getBytes()).substring(0, 16);
+        String cacheKey = "listPictureVOByPage:" + hashKey;
+
+        PagePictureCacheTemplate pagePictureCacheTemplate = localCache;
+        if (!"local".equals(env)) {
+            pagePictureCacheTemplate = redisCache;
+        }
+
+        String cachedValue = pagePictureCacheTemplate.getCacheValueByKey(cacheKey);
+
+        if (ObjectUtil.isNotEmpty(cachedValue)) {
+            // 如果缓存命中，返回结果
+            PageVO<PictureVO> cachedPage = JSONUtil.toBean(cachedValue, PageVO.class);
+            return ResultUtils.success(cachedPage);
+        }
+
+        Page<PictureDO> page = pictureService.lambdaQuery()
+                .select(
+                        PictureDO::getId,
+                        PictureDO::getUrl,
+                        PictureDO::getThumbnailUrl,
+                        PictureDO::getName,
+                        PictureDO::getIntroduction,
+                        PictureDO::getCategory,
+                        PictureDO::getPicSize,
+                        PictureDO::getPicWidth,
+                        PictureDO::getPicHeight,
+                        PictureDO::getPicScale,
+                        PictureDO::getPicFormat,
+                        PictureDO::getUserId,
+                        PictureDO::getReviewStatus,
+                        PictureDO::getReviewerId,
+                        PictureDO::getReviewMessage,
+                        PictureDO::getReviewTime,
+                        PictureDO::getGmtCreate,
+                        PictureDO::getGmtModified
+                )
+                .eq(ObjectUtil.isNotEmpty(id), PictureDO::getId, id)
+                .eq(ObjectUtil.isNotEmpty(userId), PictureDO::getUserId, userId)
+                .eq(ObjectUtil.isNotEmpty(category), PictureDO::getCategory, category)
+                .eq(ObjectUtil.isNotEmpty(picWidth), PictureDO::getPicWidth, picWidth)
+                .eq(ObjectUtil.isNotEmpty(picHeight), PictureDO::getPicHeight, picHeight)
+                .eq(ObjectUtil.isNotEmpty(picSize), PictureDO::getPicSize, picSize)
+                .eq(ObjectUtil.isNotEmpty(picScale), PictureDO::getPicScale, picScale)
+                .eq(ObjectUtil.isNotEmpty(reviewStatus), PictureDO::getReviewStatus, reviewStatus)
+                .eq(ObjectUtil.isNotEmpty(reviewerId), PictureDO::getReviewerId, reviewerId)
+                .in(ObjectUtil.isNotEmpty(pictureIds), PictureDO::getId, pictureIds)
+                .like(ObjectUtil.isNotEmpty(name), PictureDO::getName, name)
+                .like(ObjectUtil.isNotEmpty(introduction), PictureDO::getIntroduction, introduction)
+                .like(ObjectUtil.isNotEmpty(picFormat), PictureDO::getPicFormat, picFormat)
+                .and(ObjectUtil.isNotEmpty(searchText), t -> {
+                    t.like(PictureDO::getName, searchText)
+                            .or()
+                            .like(PictureDO::getIntroduction, introduction);
+                })
+                .ge(ObjectUtil.isNotEmpty(startUploadTime), PictureDO::getGmtCreate, startUploadTime)
+                .le(ObjectUtil.isNotEmpty(endUploadTime), PictureDO::getGmtCreate, endUploadTime)
+                .orderByDesc(PictureDO::getGmtModified)
+                .page(qo.getPage());
+
+        pageVO.setTotalRow(page.getTotal());
+
+        List<PictureVO> rtList = new ArrayList<>();
+        List<PictureDO> pictureList = page.getRecords();
+        if (ObjectUtil.isNotEmpty(pictureList)) {
+            // 获取图片标签信息
+            List<Long> pictureIdList = pictureList.stream().map(PictureDO::getId).toList();
+            Map<Long, List<PictureTagDO>> pictureTagMap = pictureTagService.lambdaQuery()
+                    .select(PictureTagDO::getPictureId, PictureTagDO::getTagName)
+                    .in(PictureTagDO::getPictureId, pictureIdList)
+                    .list()
+                    .stream()
+                    .collect(Collectors.groupingBy(PictureTagDO::getPictureId));
+            // 获取用户信息
+            Set<Long> userIdSet = pictureList.stream().map(PictureDO::getUserId).collect(Collectors.toSet());
+            Map<Long, UserDO> userMap = userService.listByIds(userIdSet).stream().collect(Collectors.toMap(UserDO::getId, Function.identity()));
+
+            pictureList.forEach(t -> {
+                List<PictureTagDO> pictureTagDOS = pictureTagMap.get(t.getId());
+                pictureTagDOS = Optional.ofNullable(pictureTagDOS).orElse(new ArrayList<>());
+                List<String> tagNameList = pictureTagDOS.stream().map(PictureTagDO::getTagName).toList();
+                PictureVO vo = new PictureVO();
+                vo.setId(t.getId())
+                        .setUrl(t.getUrl())
+                        .setThumbnailUrl(t.getThumbnailUrl())
+                        .setName(t.getName())
+                        .setIntroduction(t.getIntroduction())
+                        .setTags(tagNameList)
+                        .setCategory(t.getCategory())
+                        .setPicSize(t.getPicSize())
+                        .setPicWidth(t.getPicWidth())
+                        .setPicHeight(t.getPicHeight())
+                        .setPicScale(t.getPicScale())
+                        .setPicFormat(t.getPicFormat())
+                        .setUserId(t.getUserId())
+                        .setUser(userService.getUserVO(userMap.get(t.getUserId())))
+                        .setGmtCreate(t.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
+                        .setGmtModified(t.getGmtModified().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)));
+                rtList.add(vo);
+
+            });
+        }
+
+        pageVO.setList(rtList);
+
+
+        // 存入redis缓存
+        String cacheValue = JSONUtil.toJsonStr(pageVO);
+
+        pagePictureCacheTemplate.setCache(cacheKey, cacheValue);
+
+
+        return ResultUtils.success(pageVO);
+    }
+
+    /**
+     * 更新图片信息
+     * @param qo
+     * @param request
+     * @return
+     */
+    @PostMapping("/updatePicture")
+    public BaseResponse<Object> updatePicture(@RequestBody @Validated PictureUpdateQO qo, HttpServletRequest request) {
+
+        UserDO loginUser = userService.getLoginUser(request);
+        PictureDO oldPictureDO = pictureService.lambdaQuery()
+                .select(
+                        PictureDO::getId,
+                        PictureDO::getUserId
+                )
+                .eq(PictureDO::getId, qo.getId())
+                .one();
+        // 仅本人和管理员可编辑图片
+        if (!oldPictureDO.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+
+        pictureService.updatePicture(qo, loginUser);
+
+        return ResultUtils.success();
+    }
+
+    /**
      * 根据图片id，删除图片
      *
      * @param qo
@@ -499,7 +687,7 @@ public class PictureController {
         Long userId = loginUser.getId();
 
         PictureDO oldPicture = pictureService.lambdaQuery()
-                .select(PictureDO::getId, PictureDO::getUserId)
+                .select(PictureDO::getId, PictureDO::getUserId, PictureDO::getUrl, PictureDO::getThumbnailUrl)
                 .eq(PictureDO::getId, id)
                 .one();
         ThrowUtils.throwIf(ObjectUtil.isEmpty(oldPicture), ErrorCode.NOT_FOUND_ERROR);
@@ -511,6 +699,9 @@ public class PictureController {
 
         // 操作数据库
         pictureService.removeById(id);
+
+        // 删除对象存储中的文件
+        pictureService.clearPictureFile(oldPicture);
 
         return ResultUtils.success();
     }
@@ -533,6 +724,21 @@ public class PictureController {
         pictureService.doPictureReview(qo, loginUser);
 
         return ResultUtils.success();
+    }
+
+    /**
+     * 批量拉取图片
+     * @param qo
+     * @param request
+     * @return
+     */
+    @PostMapping("/upload/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Integer> uploadPictureByBatch(@RequestBody PictureUploadByBatchQO qo, HttpServletRequest request) {
+        ThrowUtils.throwIf(qo == null, ErrorCode.PARAMS_ERROR);
+        UserDO loginUser = userService.getLoginUser(request);
+        Integer uploadCount = pictureService.uploadPictureByBatch(qo, loginUser);
+        return ResultUtils.success(uploadCount);
     }
 
 }

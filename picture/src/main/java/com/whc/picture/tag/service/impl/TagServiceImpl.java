@@ -45,6 +45,9 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, TagDO>
 
     @Override
     public void insertTag(List<String> tags) {
+        if (ObjectUtil.isEmpty(tags)) {
+            return;
+        }
         Map<String, Long> allTagMap = getAllTagMap();
 
         List<TagDO> insertTags = new ArrayList<>();

@@ -16,4 +16,9 @@ public class PictureQO {
      */
     private String fileUrl;
 
+    /**
+     * 图片名称
+     */
+    private String picName;
+
 }

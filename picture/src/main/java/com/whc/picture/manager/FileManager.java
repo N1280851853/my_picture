@@ -11,7 +11,9 @@ import cn.hutool.http.HttpStatus;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.http.Method;
 import com.qcloud.cos.model.PutObjectResult;
+import com.qcloud.cos.model.ciModel.persistence.CIObject;
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;
+import com.qcloud.cos.model.ciModel.persistence.ProcessResults;
 import com.whc.picture.entity.picture.entity.PictureDO;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
@@ -78,22 +80,17 @@ public class FileManager {
             PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
             // 获取图片原始信息
             ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+            // 获取到图片处理结果
+            ProcessResults processResults = putObjectResult.getCiUploadResult().getProcessResults();
+            List<CIObject> objectList = processResults.getObjectList();
+            if (ObjectUtil.isNotEmpty(objectList)) {
+                // 因为目前只有一个规则因此只会有一个结果值
+                CIObject compressedCiObject = objectList.get(0);
+                // 封装压缩图的返回结果
+                return buildResult(originalFilename, compressedCiObject);
+            }
 
-            // 计算宽高比
-            int picWidth = imageInfo.getWidth();
-            int picHeight = imageInfo.getHeight();
-            double picScale = NumberUtil.round(picWidth * 1.0 / picHeight , 2).doubleValue();
-
-            PictureDO pictureDO = new PictureDO();
-            pictureDO.setUrl(cosProperty.getHost() + uploadPath)
-                    .setName(FileUtil.mainName(originalFilename))
-                    .setPicSize(FileUtil.size(file))
-                    .setPicWidth(picWidth)
-                    .setPicHeight(picHeight)
-                    .setPicScale(picScale)
-                    .setPicFormat(imageInfo.getFormat());
-
-            return pictureDO;
+            return buildResult(imageInfo, uploadPath, originalFilename, file);
         } catch (IOException e) {
             log.error("file upload error, filePath:{}", uploadPath, e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR);
@@ -102,6 +99,54 @@ public class FileManager {
             deleteTmpFile(file);
         }
 
+    }
+
+    /**
+     * 封装返回结果
+     * @param imageInfo
+     * @param uploadPath
+     * @param originalFilename
+     * @param file
+     * @return
+     */
+    private PictureDO buildResult(ImageInfo imageInfo, String uploadPath, String originalFilename, File file) {
+        // 计算宽高比
+        int picWidth = imageInfo.getWidth();
+        int picHeight = imageInfo.getHeight();
+        double picScale = NumberUtil.round(picWidth * 1.0 / picHeight , 2).doubleValue();
+
+        PictureDO pictureDO = new PictureDO();
+        pictureDO.setUrl(cosProperty.getHost() + uploadPath)
+                .setName(FileUtil.mainName(originalFilename))
+                .setPicSize(FileUtil.size(file))
+                .setPicWidth(picWidth)
+                .setPicHeight(picHeight)
+                .setPicScale(picScale)
+                .setPicFormat(imageInfo.getFormat());
+        return pictureDO;
+    }
+
+    /**
+     * 封装返回结果
+     * @param originalFilename 原始文件名称
+     * @param compressedCiObject 压缩后的对象
+     * @return
+     */
+    private PictureDO buildResult(String originalFilename, CIObject compressedCiObject) {
+        // 计算宽高比
+        int picWidth = compressedCiObject.getWidth();
+        int picHeight = compressedCiObject.getHeight();
+        double picScale = NumberUtil.round(picWidth * 1.0 / picHeight , 2).doubleValue();
+
+        PictureDO pictureDO = new PictureDO();
+        pictureDO.setUrl(cosProperty.getHost() + compressedCiObject.getKey())
+                .setName(FileUtil.mainName(originalFilename))
+                .setPicSize(compressedCiObject.getSize().longValue())
+                .setPicWidth(picWidth)
+                .setPicHeight(picHeight)
+                .setPicScale(picScale)
+                .setPicFormat(compressedCiObject.getFormat());
+        return pictureDO;
     }
 
 
