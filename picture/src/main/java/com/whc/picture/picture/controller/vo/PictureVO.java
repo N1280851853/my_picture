@@ -79,6 +79,11 @@ public class PictureVO implements Serializable {
     private Long userId;
 
     /**
+     * 空间Id
+     */
+    private Long spaceId;
+
+    /**
      * 状态：待审核; 通过; 拒绝
      */
     private String reviewStatus;

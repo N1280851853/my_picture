@@ -7,6 +7,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whc.picture.entity.picture.common.PictureReviewStatusEnum;
 import com.whc.picture.entity.picture.entity.PictureDO;
+import com.whc.picture.entity.space.entity.SpaceDO;
 import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.exception.BusinessException;
 import com.whc.picture.exception.ErrorCode;
@@ -24,6 +25,7 @@ import com.whc.picture.picture.controller.vo.PictureVO;
 import com.whc.picture.picture.service.PictureService;
 import com.whc.picture.picture.mapper.PictureMapper;
 import com.whc.picture.picture.service.PictureTagService;
+import com.whc.picture.space.service.SpaceService;
 import com.whc.picture.tag.service.TagService;
 import com.whc.picture.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
@@ -74,35 +77,78 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, PictureDO>
     @Resource
     private CosManager cosManager;
 
+    @Resource
+    private SpaceService spaceService;
+
+    @Resource
+    private TransactionTemplate transactionTemplate;
+
 
     @Override
     public PictureDO uploadPicture(Object inputSource, PictureQO pictureQO, UserDO loginUser) {
         Long pictureId = pictureQO.getId();
+        Long spaceId = pictureQO.getSpaceId();
+        Long userId = loginUser.getId();
+        SpaceDO spaceDO;
 
         // 校验参数
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
 
+        if (ObjectUtil.isNotEmpty(spaceId)) {
+            spaceDO = spaceService.lambdaQuery()
+                    .select(
+                            SpaceDO::getId,
+                            SpaceDO::getUserId,
+                            SpaceDO::getMaxSize,
+                            SpaceDO::getMaxCount,
+                            SpaceDO::getTotalCount,
+                            SpaceDO::getTotalSize
+                        )
+                    .eq(SpaceDO::getId, spaceId)
+                    .one();
+            // 校验空间是否存在
+            ThrowUtils.throwIf(ObjectUtil.isEmpty(spaceDO), ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+            // 校验是否有空间的权限
+            ThrowUtils.throwIf(!(Objects.equals(userId, spaceDO.getUserId())), ErrorCode.NO_AUTH_ERROR, "没有空间权限");
+            // 校验额度
+            if (spaceDO.getTotalCount() >= spaceDO.getMaxCount()) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "空间条数不足");
+            }
+            if (spaceDO.getTotalSize() >= spaceDO.getMaxSize()) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "空间大小不足");
+            }
+        } else {
+            spaceDO = null;
+        }
+
         // 上传图片，得到图片信息
-        // 划分目录
-        Long userId = loginUser.getId();
-        String uploadPathPrefix = String.format("public/%s", userId);
+        // 按照空间划分目录
+        String uploadPathPrefix;
+        if (spaceId == null) {
+            uploadPathPrefix = String.format("public/%s", userId);
+        } else {
+            // 空间
+            uploadPathPrefix = String.format("space/%s", spaceId);
+        }
         PictureUploadTemplate pictureUploadTemplate = filePictureUpload;
         if (inputSource instanceof String) {
             pictureUploadTemplate = urlPictureUpload;
         }
+        // 上传图片并保存图片信息
         PictureDO pictureDO = pictureUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
         pictureDO.setUserId(userId);
+        pictureDO.setSpaceId(spaceId);
 
         String picName = pictureQO.getPicName();
         // 支持外层传递图片名称
-        if (null != pictureQO && StrUtil.isNotEmpty(picName)) {
+        if (StrUtil.isNotEmpty(picName)) {
             pictureDO.setName(picName);
         }
 
         // 判断是 新增还是删除
         if (ObjectUtil.isNotEmpty(pictureId)) {
             PictureDO oldPictureDO = this.lambdaQuery()
-                    .select(PictureDO::getUserId)
+                    .select(PictureDO::getUserId, PictureDO::getSpaceId)
                     .eq(PictureDO::getId, pictureId)
                     .one();
 
@@ -112,12 +158,35 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, PictureDO>
             if (!oldPictureDO.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
                 throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
             }
+
+            // 如果没传spaceId,则复用原来的图片 spaceId（兼容公共图库）
+            if (spaceId == null) {
+                if (oldPictureDO.getSpaceId() != null) {
+                    spaceId = oldPictureDO.getSpaceId();
+                }
+            } else {
+                // 传了spaceId, 校验是否和之前的一致(防止更新的时候传到其他空间去)
+                if (!Objects.equals(spaceId, oldPictureDO.getSpaceId())) {
+                    throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间 id 不一致");
+                }
+            }
         }
         // 插入数据库之前补充审核参数
         this.fillReviewParams(pictureDO, loginUser);
 
-        // saveOrUpdate() 会根据传入的对象是否有id，来决定是更新还是新增
-        this.saveOrUpdate(pictureDO);
+        transactionTemplate.execute(status -> {
+            // saveOrUpdate() 会根据传入的对象是否有id，来决定是更新还是新增
+            this.saveOrUpdate(pictureDO);
+
+            // 如果上传的是公共空间则不更新，私有空间的话要更新空间的使用额度
+            if (ObjectUtil.isNotEmpty(spaceDO)) {
+                spaceDO.setTotalCount(spaceDO.getTotalCount() + 1)
+                        .setTotalSize(spaceDO.getTotalSize() + pictureDO.getPicSize());
+                spaceService.updateById(spaceDO);
+            }
+            return pictureDO;
+        });
+
 
         return pictureDO;
     }
@@ -149,6 +218,29 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, PictureDO>
         // 保存标签与图片的关联关系
         pictureTagService.savePictureRelationTag(pictureId, pictureName, tags);
 
+    }
+
+    @Override
+    public void deletePictureById(PictureDO oldPicture) {
+        Long pictureId = oldPicture.getId();
+        Long spaceId = oldPicture.getSpaceId();
+        SpaceDO spaceDO = spaceService.lambdaQuery()
+                .select(SpaceDO::getId, SpaceDO::getTotalSize, SpaceDO::getTotalCount)
+                .eq(SpaceDO::getId, spaceId)
+                .one();
+        // 操作数据库
+        transactionTemplate.execute(status -> {
+            // saveOrUpdate() 会根据传入的对象是否有id，来决定是更新还是新增
+            this.removeById(pictureId);
+
+            // 如果上传的是公共空间则不更新，私有空间的话要更新空间的使用额度
+            if (ObjectUtil.isNotEmpty(spaceDO)) {
+                spaceDO.setTotalCount(spaceDO.getTotalCount() - 1)
+                        .setTotalSize(spaceDO.getTotalSize() - oldPicture.getPicSize());
+                spaceService.updateById(spaceDO);
+            }
+            return oldPicture;
+        });
     }
 
     @Override
@@ -267,6 +359,23 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, PictureDO>
         String thumbnailUrl = oldPicture.getThumbnailUrl();
         if (StrUtil.isNotBlank(thumbnailUrl)) {
             cosManager.deleteObject(thumbnailUrl);
+        }
+    }
+
+    @Override
+    public void checkPictureAuth(UserDO loginUser, PictureDO pictureDO) {
+        Long spaceId = pictureDO.getSpaceId();
+        Long loginUserId = loginUser.getId();
+        if (spaceId != null) {
+            // 公共图片，仅本人或管理员可操作
+            if (!pictureDO.getUserId().equals(loginUserId) && !userService.isAdmin(loginUser)) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+            }
+        } else {
+            // 私有空间，仅空间管理员可操作
+            if (!pictureDO.getUserId().equals(loginUserId)) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+            }
         }
     }
 

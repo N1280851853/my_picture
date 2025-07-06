@@ -33,6 +33,12 @@ public interface PictureService extends IService<PictureDO> {
     void updatePicture(PictureUpdateQO qo, UserDO loginUser);
 
     /**
+     * 删除图片
+     * @param oldPicture
+     */
+    void deletePictureById(PictureDO oldPicture);
+
+    /**
      * 图片审核
      * @param qo
      * @param loginUser
@@ -59,4 +65,11 @@ public interface PictureService extends IService<PictureDO> {
      * @param oldPicture
      */
     void clearPictureFile(PictureDO oldPicture);
+
+    /**
+     * 校验图片空间的权限
+     * @param loginUser
+     * @param pictureDO
+     */
+    void checkPictureAuth(UserDO loginUser, PictureDO pictureDO);
 }

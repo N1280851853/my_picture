@@ -21,4 +21,9 @@ public class PictureQO {
      */
     private String picName;
 
+    /**
+     * 空间Id
+     */
+    private Long spaceId;
+
 }

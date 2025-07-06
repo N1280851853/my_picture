@@ -13,6 +13,7 @@ import com.whc.picture.constant.UserConstant;
 import com.whc.picture.entity.picture.common.PictureReviewStatusEnum;
 import com.whc.picture.entity.picture.entity.PictureDO;
 import com.whc.picture.entity.picture.entity.PictureTagDO;
+import com.whc.picture.entity.space.entity.SpaceDO;
 import com.whc.picture.entity.tag.entity.TagDO;
 import com.whc.picture.entity.user.UserDO;
 import com.whc.picture.exception.BusinessException;
@@ -26,6 +27,7 @@ import com.whc.picture.picture.controller.vo.ListPagePictureVO;
 import com.whc.picture.picture.controller.vo.PictureVO;
 import com.whc.picture.picture.service.PictureService;
 import com.whc.picture.picture.service.PictureTagService;
+import com.whc.picture.space.service.SpaceService;
 import com.whc.picture.tag.service.TagService;
 import com.whc.picture.user.controller.vo.LoginUserVO;
 import com.whc.picture.user.service.UserService;
@@ -72,6 +74,9 @@ public class PictureController {
 
     @Value("${spring.profiles.active}")
     private String env;
+
+    @Resource
+    private SpaceService spaceService;
 
     /**
      * 上传图片(可重新上传)
@@ -125,7 +130,8 @@ public class PictureController {
                 .setPicScale(pictureDO.getPicScale())
                 .setPicFormat(pictureDO.getPicFormat())
                 .setUserId(loginUser.getId())
-                .setUser(loginUser);
+                .setUser(loginUser)
+                .setSpaceId(pictureDO.getSpaceId());
 
         return ResultUtils.success(vo);
 
@@ -165,6 +171,13 @@ public class PictureController {
                 .eq(PictureDO::getReviewStatus, PictureReviewStatusEnum.PASS.getValue())
                 .one();
         ThrowUtils.throwIf(ObjectUtil.isEmpty(pictureDO), ErrorCode.PARAMS_ERROR);
+
+        // 校验空间权限
+        Long spaceId = pictureDO.getSpaceId();
+        if (spaceId != null) {
+            UserDO loginUser = userService.getLoginUser(request);
+            pictureService.checkPictureAuth(loginUser, pictureDO);
+        }
 
         Long userId = pictureDO.getUserId();
         PictureVO vo = new PictureVO();
@@ -338,7 +351,7 @@ public class PictureController {
      * 分页获取图片列表（仅普通用户可用）
      */
     @PostMapping("/listPagePictureVO")
-    public BaseResponse<PageVO<PictureVO>> listPagePictureVO(@RequestBody ListPagePictureQO qo) {
+    public BaseResponse<PageVO<PictureVO>> listPagePictureVO(@RequestBody ListPagePictureQO qo, HttpServletRequest request) {
         Long id = qo.getId();
         String name = qo.getName();
         String introduction = qo.getIntroduction();
@@ -350,9 +363,9 @@ public class PictureController {
         String picFormat = qo.getPicFormat();
         String searchText = qo.getSearchText();
         Long userId = qo.getUserId();
+        Long spaceId = qo.getSpaceId();
+        Boolean isNullSpaceId = qo.getNullSpaceId();
         Integer reviewStatus = qo.getReviewStatus();
-        // 普通用户只能看到审核通过的数据
-        reviewStatus = PictureReviewStatusEnum.PASS.getValue();
         Long reviewerId = qo.getReviewerId();
         String reviewMessage = qo.getReviewMessage();
         Date reviewTime = qo.getReviewTime();
@@ -384,6 +397,24 @@ public class PictureController {
             pictureIds = pictureTagDOS.stream().map(PictureTagDO::getPictureId).collect(Collectors.toSet());
         }
 
+        if (spaceId == null) {
+            // 公开图库
+            isNullSpaceId = true;
+            // 普通用户只能看到审核通过的数据
+            reviewStatus = PictureReviewStatusEnum.PASS.getValue();
+        } else {
+            // 私有空间
+            UserDO loginUser = userService.getLoginUser(request);
+            SpaceDO spaceDO = spaceService.lambdaQuery()
+                    .select(SpaceDO::getId)
+                    .eq(SpaceDO::getId, spaceId)
+                    .one();
+            ThrowUtils.throwIf(null == spaceDO, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+            if (!loginUser.getId().equals(spaceDO.getUserId())) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
+            }
+        }
+
         Page<PictureDO> page = pictureService.lambdaQuery()
                 .select(
                         PictureDO::getId,
@@ -398,6 +429,7 @@ public class PictureController {
                         PictureDO::getPicScale,
                         PictureDO::getPicFormat,
                         PictureDO::getUserId,
+                        PictureDO::getSpaceId,
                         PictureDO::getReviewStatus,
                         PictureDO::getReviewerId,
                         PictureDO::getReviewMessage,
@@ -407,6 +439,8 @@ public class PictureController {
                 )
                 .eq(ObjectUtil.isNotEmpty(id), PictureDO::getId, id)
                 .eq(ObjectUtil.isNotEmpty(userId), PictureDO::getUserId, userId)
+                .eq(ObjectUtil.isNotEmpty(spaceId), PictureDO::getSpaceId, spaceId)
+                .isNull(isNullSpaceId, PictureDO::getSpaceId)
                 .eq(ObjectUtil.isNotEmpty(category), PictureDO::getCategory, category)
                 .eq(ObjectUtil.isNotEmpty(picWidth), PictureDO::getPicWidth, picWidth)
                 .eq(ObjectUtil.isNotEmpty(picHeight), PictureDO::getPicHeight, picHeight)
@@ -463,6 +497,7 @@ public class PictureController {
                         .setPicScale(t.getPicScale())
                         .setPicFormat(t.getPicFormat())
                         .setUserId(t.getUserId())
+                        .setSpaceId(t.getSpaceId())
                         .setUser(userService.getUserVO(userMap.get(t.getUserId())))
                         .setGmtCreate(t.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
                         .setGmtModified(t.getGmtModified().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)));
@@ -479,8 +514,9 @@ public class PictureController {
     /**
      * 分页获取图片列表-有缓存（仅普通用户可用）
      */
+    @Deprecated
     @PostMapping("/listPagePictureVOByCache")
-    public BaseResponse<PageVO<PictureVO>> listPagePictureVOByCache(@RequestBody ListPagePictureQO qo) {
+    public BaseResponse<PageVO<PictureVO>> listPagePictureVOByCache(@RequestBody ListPagePictureQO qo, HttpServletRequest request) {
         Long id = qo.getId();
         String name = qo.getName();
         String introduction = qo.getIntroduction();
@@ -492,9 +528,9 @@ public class PictureController {
         String picFormat = qo.getPicFormat();
         String searchText = qo.getSearchText();
         Long userId = qo.getUserId();
+        Long spaceId = qo.getSpaceId();
+        Boolean isNullSpaceId = qo.getNullSpaceId();
         Integer reviewStatus = qo.getReviewStatus();
-        // 普通用户只能看到审核通过的数据
-        reviewStatus = PictureReviewStatusEnum.PASS.getValue();
         Long reviewerId = qo.getReviewerId();
         String reviewMessage = qo.getReviewMessage();
         Date reviewTime = qo.getReviewTime();
@@ -524,6 +560,24 @@ public class PictureController {
                 return ResultUtils.success(pageVO);
             }
             pictureIds = pictureTagDOS.stream().map(PictureTagDO::getPictureId).collect(Collectors.toSet());
+        }
+
+        if (spaceId == null) {
+            // 公开图库
+            isNullSpaceId = true;
+            // 普通用户只能看到审核通过的数据
+            reviewStatus = PictureReviewStatusEnum.PASS.getValue();
+        } else {
+            // 私有空间
+            UserDO loginUser = userService.getLoginUser(request);
+            SpaceDO spaceDO = spaceService.lambdaQuery()
+                    .select(SpaceDO::getId)
+                    .eq(SpaceDO::getId, spaceId)
+                    .one();
+            ThrowUtils.throwIf(null == spaceDO, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+            if (!loginUser.getId().equals(spaceDO.getUserId())) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
+            }
         }
 
         // 查询缓存、缓存里面没有再去查询数据库
@@ -560,6 +614,7 @@ public class PictureController {
                         PictureDO::getPicScale,
                         PictureDO::getPicFormat,
                         PictureDO::getUserId,
+                        PictureDO::getSpaceId,
                         PictureDO::getReviewStatus,
                         PictureDO::getReviewerId,
                         PictureDO::getReviewMessage,
@@ -569,6 +624,8 @@ public class PictureController {
                 )
                 .eq(ObjectUtil.isNotEmpty(id), PictureDO::getId, id)
                 .eq(ObjectUtil.isNotEmpty(userId), PictureDO::getUserId, userId)
+                .eq(ObjectUtil.isNotEmpty(spaceId), PictureDO::getSpaceId, spaceId)
+                .isNull(isNullSpaceId, PictureDO::getSpaceId)
                 .eq(ObjectUtil.isNotEmpty(category), PictureDO::getCategory, category)
                 .eq(ObjectUtil.isNotEmpty(picWidth), PictureDO::getPicWidth, picWidth)
                 .eq(ObjectUtil.isNotEmpty(picHeight), PictureDO::getPicHeight, picHeight)
@@ -625,6 +682,7 @@ public class PictureController {
                         .setPicScale(t.getPicScale())
                         .setPicFormat(t.getPicFormat())
                         .setUserId(t.getUserId())
+                        .setSpaceId(t.getSpaceId())
                         .setUser(userService.getUserVO(userMap.get(t.getUserId())))
                         .setGmtCreate(t.getGmtCreate().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)))
                         .setGmtModified(t.getGmtModified().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)));
@@ -655,17 +713,16 @@ public class PictureController {
     public BaseResponse<Object> updatePicture(@RequestBody @Validated PictureUpdateQO qo, HttpServletRequest request) {
 
         UserDO loginUser = userService.getLoginUser(request);
-        PictureDO oldPictureDO = pictureService.lambdaQuery()
+        PictureDO oldPicture = pictureService.lambdaQuery()
                 .select(
                         PictureDO::getId,
-                        PictureDO::getUserId
+                        PictureDO::getUserId,
+                        PictureDO::getSpaceId
                 )
                 .eq(PictureDO::getId, qo.getId())
                 .one();
         // 仅本人和管理员可编辑图片
-        if (!oldPictureDO.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
+        pictureService.checkPictureAuth(loginUser, oldPicture);
 
         pictureService.updatePicture(qo, loginUser);
 
@@ -680,25 +737,28 @@ public class PictureController {
      */
     @PostMapping("/deletePicture")
     public BaseResponse<Object> deletePicture(@RequestBody @Validated DeletePictureQO qo, HttpServletRequest request) {
-        Long id = qo.getId();
+        Long pictureId = qo.getId();
 
         // 用户或者管理员可以删除自己的图片，所以要判断要删除的图片是否属于自己
         UserDO loginUser = userService.getLoginUser(request);
-        Long userId = loginUser.getId();
 
         PictureDO oldPicture = pictureService.lambdaQuery()
-                .select(PictureDO::getId, PictureDO::getUserId, PictureDO::getUrl, PictureDO::getThumbnailUrl)
-                .eq(PictureDO::getId, id)
+                .select(
+                        PictureDO::getId,
+                        PictureDO::getUserId,
+                        PictureDO::getUrl,
+                        PictureDO::getPicSize,
+                        PictureDO::getThumbnailUrl,
+                        PictureDO::getSpaceId
+                    )
+                .eq(PictureDO::getId, pictureId)
                 .one();
         ThrowUtils.throwIf(ObjectUtil.isEmpty(oldPicture), ErrorCode.NOT_FOUND_ERROR);
 
-        // 仅本人和超级管理员可删除
-        if (!oldPicture.getUserId().equals(userId) || !userService.isAdmin(loginUser)) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
+        // 校验图片空间权限
+        pictureService.checkPictureAuth(loginUser, oldPicture);
 
-        // 操作数据库
-        pictureService.removeById(id);
+        pictureService.deletePictureById(oldPicture);
 
         // 删除对象存储中的文件
         pictureService.clearPictureFile(oldPicture);
