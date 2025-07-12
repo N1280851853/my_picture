@@ -3,6 +3,7 @@ package com.whc.picture.entity.space.entity;
 import com.baomidou.mybatisplus.annotation.*;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.Date;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -67,13 +68,13 @@ public class SpaceDO implements Serializable {
      * 创建时间
      */
     @TableField(value = "gmt_create")
-    private Date gmtCreate;
+    private LocalDateTime gmtCreate;
 
     /**
      * 更新时间
      */
     @TableField(value = "gmt_modified")
-    private Date gmtModified;
+    private LocalDateTime gmtModified;
 
     /**
      * 是否删除

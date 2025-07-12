@@ -41,12 +41,14 @@ public class PictureTagServiceImpl extends ServiceImpl<PictureTagMapper, Picture
         Map<String, Long> allTagMap = tagService.getAllTagMap();
         List<PictureTagDO> insertDOS = new ArrayList<>();
         tags.forEach(tag -> {
-            PictureTagDO entity = new PictureTagDO();
-            entity.setPictureId(pictureId)
-                    .setPictureName(pictureName)
-                    .setTagId(allTagMap.get(tag))
-                    .setTagName(tag);
-            insertDOS.add(entity);
+            if (ObjectUtil.isNotEmpty(tag)) {
+                PictureTagDO entity = new PictureTagDO();
+                entity.setPictureId(pictureId)
+                        .setPictureName(pictureName)
+                        .setTagId(allTagMap.get(tag))
+                        .setTagName(tag);
+                insertDOS.add(entity);
+            }
         });
         this.saveBatch(insertDOS);
     }

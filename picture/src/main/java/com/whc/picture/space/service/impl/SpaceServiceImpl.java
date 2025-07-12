@@ -52,8 +52,6 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, SpaceDO>
         }
         spaceDO.setSpaceName(spaceName)
                 .setSpaceLevel(spaceLevel);
-        // 填充空间大小和容量
-        fillSpaceBySpaceLevel(spaceDO);
 
         // 校验权限
         UserDO loginUser = userService.getLoginUser(request);
@@ -64,6 +62,9 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, SpaceDO>
             // 非管理员只能创建普通级别的空间
             spaceDO.setSpaceLevel(0);
         }
+
+        // 填充空间大小和容量
+        fillSpaceBySpaceLevel(spaceDO);
 
         // 控制同一个用户只能创建一个私有空间
         Object lock = lockMap.computeIfAbsent(userId, key -> new Object());

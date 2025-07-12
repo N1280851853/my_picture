@@ -54,21 +54,27 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, TagDO>
         // 如果数据库中没有标签
         if (ObjectUtil.isEmpty(allTagMap)) {
             tags.forEach(t -> {
-                TagDO tagDO = new TagDO();
-                tagDO.setTagName(t);
-                insertTags.add(tagDO); // 全部新增
+                if (ObjectUtil.isNotEmpty(t)) {
+                    TagDO tagDO = new TagDO();
+                    tagDO.setTagName(t);
+                    insertTags.add(tagDO); // 全部新增
+                }
             });
         } else {
             tags.forEach(t -> {
-                Long id = allTagMap.get(t);
-                if (id == null) { // 表示这个标签还没有入库
-                    TagDO tagDO = new TagDO();
-                    tagDO.setTagName(t);
-                    insertTags.add(tagDO);
+                if (ObjectUtil.isNotEmpty(t)) {
+                    Long id = allTagMap.get(t);
+                    if (id == null) { // 表示这个标签还没有入库
+                        TagDO tagDO = new TagDO();
+                        tagDO.setTagName(t);
+                        insertTags.add(tagDO);
+                    }
                 }
             });
         }
-        this.saveBatch(insertTags);
+        if (ObjectUtil.isNotEmpty(insertTags)) {
+            this.saveBatch(insertTags);
+        }
     }
 
 }

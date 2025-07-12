@@ -4,13 +4,14 @@ import com.whc.picture.user.controller.vo.LoginUserVO;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
-import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 空间视图
+ */
 @Data
 @Accessors(chain = true)
-public class ListPageSpaceVO implements Serializable {
-
+public class SpaceVO implements Serializable {
     /**
      * id
      */
@@ -65,8 +66,4 @@ public class ListPageSpaceVO implements Serializable {
      * 创建用户信息
      */
     private LoginUserVO user;
-
-    @Serial
-    private static final long serialVersionUID = 1L;
-
 }

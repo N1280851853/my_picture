@@ -404,9 +404,10 @@ public class PictureController {
             reviewStatus = PictureReviewStatusEnum.PASS.getValue();
         } else {
             // 私有空间
+            isNullSpaceId = false;
             UserDO loginUser = userService.getLoginUser(request);
             SpaceDO spaceDO = spaceService.lambdaQuery()
-                    .select(SpaceDO::getId)
+                    .select(SpaceDO::getId, SpaceDO::getUserId)
                     .eq(SpaceDO::getId, spaceId)
                     .one();
             ThrowUtils.throwIf(null == spaceDO, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
